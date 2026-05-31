@@ -8,6 +8,10 @@
 <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<!-- Firebase SDK (compat) -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'DM Sans',sans-serif;background:#F0F4F8;color:#0F1923;-webkit-font-smoothing:antialiased}
@@ -55,6 +59,18 @@ input::placeholder,textarea::placeholder{color:#94A3B8}
       e.preventDefault();
     }
   }, { passive: false });
+</script>
+<!-- ★★★ Firebase設定 — Firebaseコンソールでプロジェクト作成後、下記を書き換えてください ★★★ -->
+<script>
+const firebaseConfig = {
+  apiKey:            "AIzaSyDSo7gn1nAUnS8sjjfx4r91S0LYJWVvr7w",
+  authDomain:        "task-manager-app-35e02.firebaseapp.com",
+  projectId:         "task-manager-app-35e02",
+  storageBucket:     "task-manager-app-35e02.firebasestorage.app",
+  messagingSenderId: "74129513602",
+  appId:             "1:74129513602:web:911f8c909f8282fdf6a89b"
+};
+firebase.initializeApp(firebaseConfig);
 </script>
 </head>
 <body>
@@ -1556,16 +1572,139 @@ function WeekView({ weekDays, tasksOn, eventsOn, projOf, onSlotDblClick, onTaskC
   );
 }
 
+/* ─── AUTH SCREEN ─── */
+function AuthScreen() {
+  const [mode,     setMode]     = React.useState("login");
+  const [email,    setEmail]    = React.useState("");
+  const [password, setPassword] = React.useState("");
+  const [error,    setError]    = React.useState("");
+  const [loading,  setLoading]  = React.useState(false);
+  const auth = firebase.auth();
+
+  const handleEmail = async () => {
+    if (!email.trim() || !password) { setError("メールアドレスとパスワードを入力してください"); return; }
+    setLoading(true); setError("");
+    try {
+      if (mode === "login") {
+        await auth.signInWithEmailAndPassword(email.trim(), password);
+      } else {
+        await auth.createUserWithEmailAndPassword(email.trim(), password);
+      }
+    } catch (e) {
+      const MSG = {
+        "auth/user-not-found":       "メールアドレスが登録されていません",
+        "auth/wrong-password":        "パスワードが間違っています",
+        "auth/invalid-email":         "メールアドレスの形式が正しくありません",
+        "auth/email-already-in-use":  "このメールアドレスは既に使用されています",
+        "auth/weak-password":         "パスワードは6文字以上で入力してください",
+        "auth/invalid-credential":    "メールアドレスまたはパスワードが正しくありません",
+        "auth/too-many-requests":     "試行回数が多すぎます。しばらくしてから再試行してください",
+      };
+      setError(MSG[e.code] || e.message);
+    }
+    setLoading(false);
+  };
+
+  const handleGoogle = async () => {
+    setLoading(true); setError("");
+    try {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      await auth.signInWithPopup(provider);
+    } catch (e) {
+      if (e.code !== "auth/popup-closed-by-user") setError(e.message);
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#F0F4F8",fontFamily:"'DM Sans',sans-serif"}}>
+      <div style={{background:"#fff",borderRadius:16,padding:40,width:400,maxWidth:"95vw",boxShadow:"0 20px 60px rgba(0,0,0,.12)"}} className="fade">
+        <div style={{textAlign:"center",marginBottom:28}}>
+          <div style={{width:52,height:52,borderRadius:14,background:"#EFF6FF",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,margin:"0 auto 12px"}}>📅</div>
+          <h1 style={{fontSize:22,fontWeight:800,color:"#0F1923",letterSpacing:"-.5px",margin:0}}>タスク管理ツール</h1>
+          <p style={{fontSize:13,color:"#94A3B8",marginTop:6,marginBottom:0}}>
+            {mode==="login" ? "アカウントにサインイン" : "新しいアカウントを作成"}
+          </p>
+        </div>
+
+        <div style={{display:"flex",flexDirection:"column",gap:12}}>
+          <div>
+            <div className="lbl" style={{marginBottom:4}}>メールアドレス</div>
+            <input type="email" value={email} onChange={e=>setEmail(e.target.value)}
+              placeholder="email@example.com" style={{width:"100%"}}
+              onKeyDown={e=>e.key==="Enter"&&handleEmail()} autoFocus/>
+          </div>
+          <div>
+            <div className="lbl" style={{marginBottom:4}}>パスワード</div>
+            <input type="password" value={password} onChange={e=>setPassword(e.target.value)}
+              placeholder={mode==="register"?"6文字以上":"パスワード"} style={{width:"100%"}}
+              onKeyDown={e=>e.key==="Enter"&&handleEmail()}/>
+          </div>
+
+          {error && (
+            <div style={{background:"#FEF2F2",border:"1px solid #FECACA",borderRadius:8,padding:"10px 12px",fontSize:12,color:"#DC2626",lineHeight:1.5}}>{error}</div>
+          )}
+
+          <button className="btn" onClick={handleEmail} disabled={loading}
+            style={{background:"#1D4ED8",color:"#fff",padding:"12px",fontSize:13,width:"100%",
+              opacity:loading?0.6:1,boxShadow:"0 2px 8px rgba(29,78,216,.25)",marginTop:4}}>
+            {loading ? "処理中..." : mode==="login" ? "サインイン" : "アカウントを作成"}
+          </button>
+
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <div style={{flex:1,height:1,background:"#E2E8F0"}}/>
+            <span style={{fontSize:11,color:"#CBD5E1",fontWeight:600}}>または</span>
+            <div style={{flex:1,height:1,background:"#E2E8F0"}}/>
+          </div>
+
+          <button className="btn" onClick={handleGoogle} disabled={loading}
+            style={{background:"#fff",color:"#374151",border:"1.5px solid #E2E8F0",padding:"11px",fontSize:13,
+              width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:8,
+              opacity:loading?0.6:1,boxShadow:"0 1px 4px rgba(0,0,0,.06)"}}>
+            <svg width="18" height="18" viewBox="0 0 48 48">
+              <path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34.1 6.5 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-3.9z"/>
+              <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 16.1 19 13 24 13c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34.1 6.5 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/>
+              <path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.3 35.3 26.8 36 24 36c-5.3 0-9.7-3.3-11.3-7.9l-6.5 5C9.6 39.6 16.3 44 24 44z"/>
+              <path fill="#1976D2" d="M43.6 20.1H42V20H24v8h11.3c-.8 2.2-2.2 4.1-4.1 5.5l6.2 5.2C41.4 35.7 44 30.3 44 24c0-1.3-.1-2.7-.4-3.9z"/>
+            </svg>
+            Googleでサインイン
+          </button>
+        </div>
+
+        <div style={{textAlign:"center",marginTop:20}}>
+          <button onClick={()=>{setMode(m=>m==="login"?"register":"login");setError("");setEmail("");setPassword("");}}
+            style={{background:"none",border:"none",color:"#1D4ED8",fontSize:12,cursor:"pointer",
+              fontFamily:"'DM Sans',sans-serif",fontWeight:600,textDecoration:"underline"}}>
+            {mode==="login" ? "アカウントをお持ちでない方はこちら（新規登録）" : "既にアカウントをお持ちの方はこちら（ログイン）"}
+          </button>
+        </div>
+
+        <div style={{marginTop:20,padding:"10px 14px",background:"#F8FAFC",borderRadius:8,border:"1px solid #E2E8F0",fontSize:11,color:"#94A3B8",lineHeight:1.7,textAlign:"center"}}>
+          🔒 データはあなたのアカウントにのみ保存されます<br/>
+          他のユーザーからは一切アクセスできません
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ─── APP ─── */
 function App() {
+  // ── 認証・Firestore状態 ──
+  const [authUser,   setAuthUser]   = useState(null);
+  const [authReady,  setAuthReady]  = useState(false);
+  const [dataLoaded, setDataLoaded] = useState(false);
+  const saveTimer = useRef(null);
+
   const [view,        setView]        = useState("dashboard");
   const [sideOpen,    setSideOpen]    = useState(true);
-  const lsGet = (k, def) => { try { const v=localStorage.getItem(k); return v?JSON.parse(v):def; } catch(e){ return def; } };
-  const [tasks,       setTasks]       = useState(()=>lsGet("sz_tasks",[]));
-  const [checklists,  setChecklists]  = useState(()=>lsGet("sz_checklists",[]));
-  const [events,      setEvents]      = useState(()=>lsGet("sz_events",[]));
-  const [projects,    setProjects]    = useState(()=>lsGet("sz_projects",[]));
-  const [companies,   setCompanies]   = useState(()=>lsGet("sz_companies",[]));
+
+  // データ状態（デフォルト値で初期化、Firestoreからロード後に上書き）
+  const [tasks,       setTasks]       = useState([]);
+  const [checklists,  setChecklists]  = useState([]);
+  const [events,      setEvents]      = useState([]);
+  const [projects,    setProjects]    = useState([]);
+  const [companies,   setCompanies]   = useState([]);
   const [calMode,     setCalMode]     = useState("month");
   const [calDate,     setCalDate]     = useState({ year:todayObj.getFullYear(), month:todayObj.getMonth() });
   const [weekStart,   setWeekStart]   = useState(TODAY);
@@ -1575,27 +1714,70 @@ function App() {
   const [taskSearch,  setTaskSearch]  = useState("");
   const [showDone,    setShowDone]    = useState(false);
 
-  // event categories (user-editable)
-  const [eventCats, setEventCats] = useState(()=>lsGet("sz_eventCats",[
+  const [eventCats, setEventCats] = useState([
     { id:"c1", label:"大会議室", color:"#6366F1", icon:"🏢" },
     { id:"c2", label:"小会議室", color:"#0891B2", icon:"🚪" },
     { id:"c3", label:"応接室",   color:"#059669", icon:"🛋" },
     { id:"c4", label:"OUT",      color:"#D97706", icon:"🚗" },
-  ]));
+  ]);
 
-  // settings
-  const [settings, setSettings] = useState(()=>lsGet("sz_settings",{ weekStartsOn: 0, reminderDays: 3 }));
+  const [settings, setSettings] = useState({ weekStartsOn: 0, reminderDays: 3 });
   const [showSettings, setShowSettings] = useState(false);
 
-  // localStorage保存
-  useEffect(()=>{ try{localStorage.setItem("sz_tasks",JSON.stringify(tasks));}catch(e){} },[tasks]);
-  useEffect(()=>{ try{localStorage.setItem("sz_checklists",JSON.stringify(checklists));}catch(e){} },[checklists]);
-  useEffect(()=>{ try{localStorage.setItem("sz_events",JSON.stringify(events));}catch(e){} },[events]);
-  useEffect(()=>{ try{localStorage.setItem("sz_projects",JSON.stringify(projects));}catch(e){} },[projects]);
-  useEffect(()=>{ try{localStorage.setItem("sz_companies",JSON.stringify(companies));}catch(e){} },[companies]);
-  useEffect(()=>{ try{localStorage.setItem("sz_eventCats",JSON.stringify(eventCats));}catch(e){} },[eventCats]);
-  useEffect(()=>{ try{localStorage.setItem("sz_settings",JSON.stringify(settings));}catch(e){} },[settings]);
-  useEffect(()=>{ try{localStorage.setItem("sz_notifSettings",JSON.stringify(notifSettings));}catch(e){} },[notifSettings]);
+  // ── Firebase認証の監視 ──
+  useEffect(() => {
+    const unsub = firebase.auth().onAuthStateChanged(user => {
+      setAuthUser(user);
+      setAuthReady(true);
+      if (!user) setDataLoaded(false);
+    });
+    return unsub;
+  }, []);
+
+  // ── Firestoreからデータをロード（ログイン時） ──
+  useEffect(() => {
+    if (!authUser) return;
+    const db = firebase.firestore();
+    db.doc(`users/${authUser.uid}/data/main`).get().then(doc => {
+      if (doc.exists) {
+        const d = doc.data();
+        if (Array.isArray(d.tasks))      setTasks(d.tasks);
+        if (Array.isArray(d.events))     setEvents(d.events);
+        if (Array.isArray(d.projects))   setProjects(d.projects);
+        if (Array.isArray(d.companies))  setCompanies(d.companies);
+        if (Array.isArray(d.checklists)) setChecklists(d.checklists);
+        if (Array.isArray(d.eventCats))  setEventCats(d.eventCats);
+        if (d.settings)      setSettings(s => ({...s, ...d.settings}));
+        if (d.notifSettings) setNotifSettings(s => ({...s, ...d.notifSettings}));
+        // colOrder（スプレッドシート列順）
+        if (d.colOrder !== undefined) {
+          try { localStorage.setItem("sz_colOrder", JSON.stringify(d.colOrder)); } catch(e) {}
+        }
+      }
+      setDataLoaded(true);
+    }).catch(err => {
+      console.error("Firestore load error:", err);
+      setDataLoaded(true);
+    });
+  }, [authUser?.uid]);
+
+  // ── Firestoreへ保存（各データ変更時、debounce 1.5秒） ──
+  const scheduleFirestoreSave = (patch) => {
+    if (!authUser) return;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      firebase.firestore().doc(`users/${authUser.uid}/data/main`).set(patch, { merge: true });
+    }, 1500);
+  };
+
+  useEffect(() => { if (dataLoaded && authUser) scheduleFirestoreSave({ tasks }); },       [tasks]);
+  useEffect(() => { if (dataLoaded && authUser) scheduleFirestoreSave({ events }); },      [events]);
+  useEffect(() => { if (dataLoaded && authUser) scheduleFirestoreSave({ projects }); },    [projects]);
+  useEffect(() => { if (dataLoaded && authUser) scheduleFirestoreSave({ companies }); },   [companies]);
+  useEffect(() => { if (dataLoaded && authUser) scheduleFirestoreSave({ checklists }); },  [checklists]);
+  useEffect(() => { if (dataLoaded && authUser) scheduleFirestoreSave({ eventCats }); },   [eventCats]);
+  useEffect(() => { if (dataLoaded && authUser) scheduleFirestoreSave({ settings }); },    [settings]);
+  useEffect(() => { if (dataLoaded && authUser) scheduleFirestoreSave({ notifSettings });}, [notifSettings]);
 
   const [notifPerm,    setNotifPerm]   = useState(typeof Notification!=="undefined"?Notification.permission:"denied");
   const [notifSettings,setNotifSettings] = useState(()=>lsGet("sz_notifSettings",{
@@ -1888,6 +2070,26 @@ function App() {
 
   const blankProj  = () => ({ name:"", color:"#2563EB", status:"未着手", owner:"", start:TODAY, end:addD(TODAY,30), progress:0 });
 
+  // ── 認証・ロード状態チェック ──
+  if (!authReady) return (
+    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#F0F4F8",fontFamily:"'DM Sans',sans-serif"}}>
+      <div style={{textAlign:"center"}}>
+        <div style={{fontSize:36,marginBottom:12}}>📅</div>
+        <div style={{fontSize:14,fontWeight:600,color:"#94A3B8"}}>読み込み中...</div>
+      </div>
+    </div>
+  );
+  if (!authUser) return <AuthScreen />;
+  if (!dataLoaded) return (
+    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#F0F4F8",fontFamily:"'DM Sans',sans-serif"}}>
+      <div style={{textAlign:"center"}}>
+        <div style={{fontSize:36,marginBottom:12}}>📅</div>
+        <div style={{fontSize:14,fontWeight:600,color:"#94A3B8"}}>データを読み込み中...</div>
+        <div style={{fontSize:12,color:"#CBD5E1",marginTop:6}}>{authUser.email}</div>
+      </div>
+    </div>
+  );
+
   return (
     <div style={{display:"flex",minHeight:"100vh",background:"#F0F4F8"}}>
 
@@ -1917,12 +2119,22 @@ function App() {
             </button>
           ))}
         </nav>
-        {/* Settings button at bottom */}
-        <div style={{padding:"10px 8px",borderTop:"1px solid #F1F5F9",flexShrink:0}}>
+        {/* Settings + Logout at bottom */}
+        <div style={{padding:"10px 8px",borderTop:"1px solid #F1F5F9",flexShrink:0,display:"flex",flexDirection:"column",gap:2}}>
+          {sideOpen && (
+            <div style={{fontSize:10,color:"#94A3B8",padding:"2px 8px 4px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontWeight:500}}>
+              {authUser?.email}
+            </div>
+          )}
           <button className="sideitem" onClick={()=>setShowSettings(true)} title={!sideOpen?"設定":""}
             style={{padding:sideOpen?"9px 10px":"9px 0",justifyContent:sideOpen?"flex-start":"center",gap:sideOpen?9:0}}>
             <span style={{fontSize:14,width:22,textAlign:"center",flexShrink:0}}>⚙</span>
             {sideOpen && <span style={{fontSize:13}}>設定</span>}
+          </button>
+          <button className="sideitem" onClick={()=>firebase.auth().signOut()} title={!sideOpen?"ログアウト":""}
+            style={{padding:sideOpen?"9px 10px":"9px 0",justifyContent:sideOpen?"flex-start":"center",gap:sideOpen?9:0,color:"#DC2626"}}>
+            <span style={{fontSize:14,width:22,textAlign:"center",flexShrink:0}}>↩</span>
+            {sideOpen && <span style={{fontSize:13}}>ログアウト</span>}
           </button>
         </div>
       </aside>
