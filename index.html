@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -1780,7 +1781,7 @@ function App() {
   useEffect(() => { if (dataLoaded && authUser) scheduleFirestoreSave({ notifSettings });}, [notifSettings]);
 
   const [notifPerm,    setNotifPerm]   = useState(typeof Notification!=="undefined"?Notification.permission:"denied");
-  const [notifSettings,setNotifSettings] = useState(()=>lsGet("sz_notifSettings",{
+  const [notifSettings,setNotifSettings] = useState({
     morning: true,
     morningTime: "09:30",
     morningDays: [1,2,3,4,5],
@@ -1789,7 +1790,7 @@ function App() {
     overdue: true,
     overdueRepeat: "hourly",
     taskNotifs: {},
-  }));
+  });
   const notifFired = useRef(new Set());
 
   // modal state
