@@ -52,6 +52,16 @@ input::placeholder,textarea::placeholder{color:#94A3B8}
 .lbl{font-size:10px;font-weight:600;color:#94A3B8;letter-spacing:.5px;text-transform:uppercase;margin-bottom:4px}
   /* time inputのホイールスクロール抑制 */
   input[type="time"] { scroll-behavior: none; }
+  /* ── モバイル対応 ── */
+  .desktop-hide { display: none; }
+  @media (max-width: 768px) {
+    .mobile-hide { display: none !important; }
+    .desktop-hide { display: inline !important; }
+    .mobile-small { font-size: 11px !important; padding: 6px 8px !important; }
+    .sidebar { position: fixed !important; z-index: 50 !important; height: 100vh !important; }
+    .sidebar-overlay { display: block !important; }
+  }
+  .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.3); z-index: 49; }
 </style>
 <script>
   document.addEventListener("wheel", function(e){
@@ -1697,7 +1707,7 @@ function App() {
   const saveTimer = useRef(null);
 
   const [view,        setView]        = useState("dashboard");
-  const [sideOpen,    setSideOpen]    = useState(true);
+  const [sideOpen,    setSideOpen]    = useState(()=> typeof window!=="undefined" && window.innerWidth > 768);
 
   // データ状態（デフォルト値で初期化、Firestoreからロード後に上書き）
   const [tasks,       setTasks]       = useState([]);
@@ -2093,6 +2103,9 @@ function App() {
   return (
     <div style={{display:"flex",minHeight:"100vh",background:"#F0F4F8"}}>
 
+      {/* スマホ用：サイドバー外タップで閉じる */}
+      {sideOpen && <div className="sidebar-overlay" onClick={()=>setSideOpen(false)}/>}
+
       {/* SIDEBAR */}
       <aside className="sidebar" style={{width:SW,flexShrink:0,background:"#fff",borderRight:"1px solid #E2E8F0",display:"flex",flexDirection:"column",position:"sticky",top:0,height:"100vh",zIndex:40,overflow:"hidden"}}>
         <div style={{padding:"0 12px",height:56,borderBottom:"1px solid #E2E8F0",display:"flex",alignItems:"center",gap:9,flexShrink:0}}>
@@ -2112,7 +2125,9 @@ function App() {
         <nav style={{padding:"10px 8px",flex:1,display:"flex",flexDirection:"column",gap:2,overflowY:"auto"}}>
           {sideOpen && <div style={{fontSize:10,fontWeight:600,color:"#CBD5E1",letterSpacing:"1px",padding:"4px 8px 6px",textTransform:"uppercase"}}>メニュー</div>}
           {NAV_ITEMS.map(({v,icon,label}) => (
-            <button key={v} className={`sideitem${view===v?" act":""}`} onClick={()=>setView(v)} title={!sideOpen?label:""}
+            <button key={v} className={`sideitem${view===v?" act":""}`}
+              onClick={()=>{ setView(v); if(window.innerWidth<=768) setSideOpen(false); }}
+              title={!sideOpen?label:""}
               style={{padding:sideOpen?"9px 10px":"9px 0",justifyContent:sideOpen?"flex-start":"center",gap:sideOpen?9:0}}>
               <span style={{fontSize:14,width:22,textAlign:"center",flexShrink:0}}>{icon}</span>
               {sideOpen && <span>{label}</span>}
@@ -2143,10 +2158,16 @@ function App() {
       <div style={{flex:1,minWidth:0,display:"flex",flexDirection:"column",overflow:"hidden"}}>
         <header style={{height:56,background:"#fff",borderBottom:"1px solid #E2E8F0",padding:"0 24px",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
           <div style={{fontSize:14,fontWeight:600,letterSpacing:"-.2px"}}>{NAV_ITEMS.find(n=>n.v===view)?.label}</div>
-          <div style={{display:"flex",gap:8}}>
-            <button className="btn" onClick={()=>setProjMdl(blankProj())} style={{background:"#F1F5F9",color:"#374151",padding:"7px 14px",fontSize:12,border:"1px solid #E2E8F0"}}>＋ 案件</button>
-            <button className="btn" onClick={()=>setEventMdl(blankEvent())} style={{background:"#6366F1",color:"#fff",padding:"7px 14px",fontSize:12,boxShadow:"0 2px 8px rgba(99,102,241,.25)"}}>📅 予定追加</button>
-            <button className="btn" onClick={()=>setTaskMdl(blankTask())} style={{background:A.main,color:"#fff",padding:"7px 16px",fontSize:12,boxShadow:"0 2px 8px rgba(29,78,216,.25)"}}>＋ タスク追加</button>
+          <div style={{display:"flex",gap:6}}>
+            <button className="btn mobile-hide" onClick={()=>setProjMdl(blankProj())} style={{background:"#F1F5F9",color:"#374151",padding:"7px 14px",fontSize:12,border:"1px solid #E2E8F0"}}>＋ 案件</button>
+            <button className="btn mobile-small" onClick={()=>setEventMdl(blankEvent())} style={{background:"#6366F1",color:"#fff",padding:"7px 14px",fontSize:12,boxShadow:"0 2px 8px rgba(99,102,241,.25)"}}>
+              <span className="mobile-hide">📅 予定追加</span>
+              <span className="desktop-hide">📅 予定</span>
+            </button>
+            <button className="btn mobile-small" onClick={()=>setTaskMdl(blankTask())} style={{background:A.main,color:"#fff",padding:"7px 16px",fontSize:12,boxShadow:"0 2px 8px rgba(29,78,216,.25)"}}>
+              <span className="mobile-hide">＋ タスク追加</span>
+              <span className="desktop-hide">＋ タスク</span>
+            </button>
           </div>
         </header>
 
