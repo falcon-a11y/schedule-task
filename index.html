@@ -3,15 +3,11 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>タスク管理ツール</title>
+<title>タスク管理</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800&display=swap" rel="stylesheet"/>
 <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-<!-- Firebase SDK (compat) -->
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'DM Sans',sans-serif;background:#F0F4F8;color:#0F1923;-webkit-font-smoothing:antialiased}
@@ -52,16 +48,6 @@ input::placeholder,textarea::placeholder{color:#94A3B8}
 .lbl{font-size:10px;font-weight:600;color:#94A3B8;letter-spacing:.5px;text-transform:uppercase;margin-bottom:4px}
   /* time inputのホイールスクロール抑制 */
   input[type="time"] { scroll-behavior: none; }
-  /* ── モバイル対応 ── */
-  .desktop-hide { display: none; }
-  @media (max-width: 768px) {
-    .mobile-hide { display: none !important; }
-    .desktop-hide { display: inline !important; }
-    .mobile-small { font-size: 11px !important; padding: 6px 8px !important; }
-    .sidebar { position: fixed !important; z-index: 50 !important; height: 100vh !important; }
-    .sidebar-overlay { display: block !important; }
-  }
-  .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.3); z-index: 49; }
 </style>
 <script>
   document.addEventListener("wheel", function(e){
@@ -69,18 +55,6 @@ input::placeholder,textarea::placeholder{color:#94A3B8}
       e.preventDefault();
     }
   }, { passive: false });
-</script>
-<!-- ★★★ Firebase設定 — Firebaseコンソールでプロジェクト作成後、下記を書き換えてください ★★★ -->
-<script>
-const firebaseConfig = {
-  apiKey:            "AIzaSyDSo7gn1nAUnS8sjjfx4r91S0LYJWVvr7w",
-  authDomain:        "task-manager-app-35e02.firebaseapp.com",
-  projectId:         "task-manager-app-35e02",
-  storageBucket:     "task-manager-app-35e02.firebasestorage.app",
-  messagingSenderId: "74129513602",
-  appId:             "1:74129513602:web:911f8c909f8282fdf6a89b"
-};
-firebase.initializeApp(firebaseConfig);
 </script>
 </head>
 <body>
@@ -107,6 +81,7 @@ const NAV_ITEMS = [
   { v:"companies",     icon:"🏢", label:"企業別管理"     },
   { v:"tasks",        icon:"≡", label:"タスク一覧"     },
   { v:"checklists",   icon:"☑", label:"チェックシート" },
+  { v:"shortcuts",    icon:"🔗", label:"ショートカット" },
 ];
 const MON   = ["1月","2月","3月","4月","5月","6月","7月","8月","9月","10月","11月","12月"];
 const HOURS = Array.from({length:24},(_,i)=>i); // 0-23
@@ -194,7 +169,7 @@ function EventChip({ item, eventCats, onClick }) {
 }
 
 /* ─── EVENT MODAL (予定) ─── */
-function EventModal({ initial, onSave, onDelete, onClose, notifPerm, eventCats, checklists }) {
+function EventModal({ initial, onSave, onDelete, onClose, notifPerm, eventCats, checklists, onAddItem }) {
   const [e, setE] = useState({...initial, checklistIds: initial.checklistIds||(initial.checklist?[initial.checklist]:[])});
   const isEdit = !!initial.id;
   const notifEnabled = e.notif?.enabled ?? false;
@@ -392,9 +367,9 @@ function EventModal({ initial, onSave, onDelete, onClose, notifPerm, eventCats, 
 }
 
 /* ─── TASK MODAL ─── */
-function TaskModal({ initial, projects, onSave, onDelete, onClose, notifPerm, onSaveProject }) {
+function TaskModal({ initial, projects, companies, onSave, onDelete, onClose, notifPerm, onSaveProject }) {
   const [t, setT] = useState({
-    title:"", date:"", time:"", timeEnd:"", priority:"medium", project:null, memo:"", repeat:"none", repeatEnd:"",
+    title:"", date:"", time:"", timeEnd:"", priority:"medium", project:null, company:null, ballStatus:"none", memo:"", repeat:"none", repeatEnd:"",
     ...initial
   });
   const isEdit = !!initial.id;
@@ -438,6 +413,28 @@ function TaskModal({ initial, projects, onSave, onDelete, onClose, notifPerm, on
               </div>
             </FieldRow>
 
+          </div>
+
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+            <div style={{display:"flex",flexDirection:"column"}}>
+              <div className="lbl" style={{marginBottom:6,fontSize:11,fontWeight:600,color:"#94A3B8",letterSpacing:".5px",textTransform:"uppercase"}}>企業</div>
+              <select value={t.company||""} onChange={e=>setT(v=>({...v,company:e.target.value||null}))} style={{width:"100%",padding:"8px",borderRadius:6,border:"1px solid #E2E8F0",fontSize:13}}>
+                <option value="">なし</option>
+                {companies&&companies.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+            <div style={{display:"flex",flexDirection:"column"}}>
+              <div className="lbl" style={{marginBottom:6,fontSize:11,fontWeight:600,color:"#94A3B8",letterSpacing:".5px",textTransform:"uppercase"}}>ボール状態</div>
+              <select value={t.ballStatus||"none"} onChange={e=>setT(v=>({...v,ballStatus:e.target.value}))} style={{width:"100%",padding:"8px",borderRadius:6,border:"1px solid #E2E8F0",fontSize:13}}>
+                <option value="none">未設定</option>
+                <option value="waiting-contact">受電待ち</option>
+                <option value="waiting-reply">返信待ち</option>
+                <option value="internal-review">社内検討</option>
+                <option value="quick-reply">すぐ返信</option>
+                <option value="phone">電話</option>
+                <option value="other">その他</option>
+              </select>
+            </div>
           </div>
           <FieldRow label="メモ">
             <textarea value={t.memo||""} onChange={e=>setT(v=>({...v,memo:e.target.value}))} placeholder="メモを入力..." rows={3}
@@ -595,7 +592,7 @@ function ProjectModal({ initial, onSave, onDelete, onClose }) {
 }
 
 /* ─── SCHEDULE VIEW（スプレッドシート形式）─── */
-function ScheduleView({ projects, tasks, onTaskToggle, onTaskClick, onAddTask }) {
+function ScheduleView({ projects, tasks, companies, onTaskToggle, onTaskClick, onAddTask }) {
   const isOverdue  = t => !t.done && t.date && t.date < TODAY;
 
 
@@ -748,19 +745,38 @@ function ScheduleView({ projects, tasks, onTaskToggle, onTaskClick, onAddTask })
                     return (
                       <td key={p.id||"other"} style={{width:COL_W,minWidth:COL_W,padding:"3px 6px 4px",borderRight:"1.5px solid #CBD5E1",verticalAlign:"top",minHeight:ROW_H}}>
                         {ct.map(t=>(
-                          <div key={t.id} style={{display:"flex",alignItems:"center",gap:5,padding:"2px 0",cursor:"pointer"}}
+                          <div key={t.id} style={{display:"flex",flexDirection:"column",gap:2,padding:"2px 0",cursor:"pointer"}}
                             onClick={()=>onTaskClick(t)}>
-                            <input type="checkbox" checked={!!t.done}
-                              onClick={e=>e.stopPropagation()}
-                              onChange={()=>onTaskToggle(t)}
-                              style={{accentColor:p.color,width:13,height:13,flexShrink:0,cursor:"pointer"}}/>
-                            <span style={{fontSize:11,lineHeight:1.4,
-                              overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:COL_W-36,
-                              textDecoration:t.done?"line-through":"none",
-                              fontWeight:isHighPrio(t)&&!t.done?700:400,
-                              color:t.done?"#94A3B8":isOverdue(t)?"#DC2626":isHighPrio(t)?"#DC2626":"#1E293B"}}>
-                              {isOverdue(t)&&<span style={{marginRight:2}}>⚠</span>}{t.title}{t._eventTitle&&<span style={{color:"#94A3B8",fontWeight:400}}> （{t._eventTitle}）</span>}
-                            </span>
+                            <div style={{display:"flex",alignItems:"center",gap:5}}>
+                              <input type="checkbox" checked={!!t.done}
+                                onClick={e=>e.stopPropagation()}
+                                onChange={()=>onTaskToggle(t)}
+                                style={{accentColor:p.color,width:13,height:13,flexShrink:0,cursor:"pointer"}}/>
+                              <span style={{fontSize:11,lineHeight:1.4,
+                                overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:COL_W-36,
+                                textDecoration:t.done?"line-through":"none",
+                                fontWeight:isHighPrio(t)&&!t.done?700:400,
+                                color:t.done?"#94A3B8":isOverdue(t)?"#DC2626":isHighPrio(t)?"#DC2626":"#1E293B"}}>
+                                {isOverdue(t)&&<span style={{marginRight:2}}>⚠</span>}{t.title}{t._eventTitle&&<span style={{color:"#94A3B8",fontWeight:400}}> （{t._eventTitle}）</span>}
+                              </span>
+                            </div>
+                            {(t.company||t.ballStatus!=="none")&&(
+                              <div style={{fontSize:8,color:"#94A3B8",lineHeight:1.3,marginLeft:18,maxWidth:COL_W-40}}>
+                                {t.company&&companies&&companies.find(c=>c.id===t.company)&&<span>{companies.find(c=>c.id===t.company)?.name}</span>}
+                                {t.ballStatus&&t.ballStatus!=="none"&&(
+                                  <span style={{marginLeft:t.company?"4px":"0"}}>
+                                    {{
+                                      "waiting-contact": "受電待",
+                                      "waiting-reply": "返信待",
+                                      "internal-review": "社内検",
+                                      "quick-reply": "返信",
+                                      "phone": "電話",
+                                      "other": "他"
+                                    }[t.ballStatus]||t.ballStatus}
+                                  </span>
+                                )}
+                              </div>
+                            )}
                           </div>
                         ))}
                         {/* 追加ボタン（常に表示） */}
@@ -824,14 +840,18 @@ const BALL = {
 const CORR_STATUS = ["提案中","交渉中","クロージング","受注","失注","保留"];
 
 function CompanyPage({ companies, setCompanies, projects, reminderDays }) {
-  const [expanded, setExpanded] = React.useState({});
+  const [sectionOpen, setSectionOpen] = React.useState({
+    "提案中": true,
+    "失注": false,
+    "受注": false
+  });
   const [editComp, setEditComp] = React.useState(null);
   const [search,   setSearch]   = React.useState("");
 
-  const toggle = (projId) => setExpanded(v=>({...v,[projId]:!v[projId]}));
+  const toggleSection = (status) => setSectionOpen(v=>({...v,[status]:!v[status]}));
 
-  const blankComp = (projId) => ({
-    id:"c"+Date.now(), name:"", person:"", project:projId||null,
+  const blankComp = () => ({
+    id:"c"+Date.now(), name:"", person:"", project:null,
     ball:"me", corrStatus:"提案中", lastDate:TODAY, reminderDate:"", nextAction:"", memo:""
   });
 
@@ -842,33 +862,31 @@ function CompanyPage({ companies, setCompanies, projects, reminderDays }) {
   };
   const delComp = (id) => { setCompanies(prev=>prev.filter(x=>x.id!==id)); setEditComp(null); };
 
-  // ボール切り替え
-  const switchBall = (c, newBall) => {
-    let reminderDate = c.reminderDate||"";
-    if(newBall==="client"){
-      // 先方にした瞬間にリマインダーを自動セット
-      reminderDate = addD(TODAY, reminderDays||3);
-    } else if(newBall==="me"){
-      // 自分に戻したらクリア
-      reminderDate = "";
-    }
-    setCompanies(prev=>prev.map(x=>x.id===c.id?{...x,ball:newBall,reminderDate,lastDate:TODAY}:x));
+  const daysSince = (d) => d?Math.floor((new Date(TODAY)-new Date(d))/(1000*60*60*24)):null;
+
+  const SECTIONS = {
+    "提案中": {bg:"#DBEAFE",color:"#1D4ED8",icon:"💼"},
+    "失注": {bg:"#E5E7EB",color:"#4B5563",icon:"❌"},
+    "受注": {bg:"#FED7AA",color:"#B45309",icon:"⭐"},
   };
 
-  const daysSince = (d) => d?Math.floor((new Date(TODAY)-new Date(d))/(1000*60*60*24)):null;
-  const isAlert   = (c) => c.ball==="client" && c.reminderDate && c.reminderDate<=TODAY;
-
-  // 検索フィルター
-  const filteredComps = (projId) => companies
-    .filter(c=>c.project===projId)
+  const filteredComps = companies
     .filter(c=>!search.trim()||c.name.toLowerCase().includes(search.toLowerCase())||(c.person||"").toLowerCase().includes(search.toLowerCase()));
+
+  const companiesByStatus = {
+    "提案中": filteredComps.filter(c=>c.corrStatus==="提案中"),
+    "失注": filteredComps.filter(c=>c.corrStatus==="失注"),
+    "受注": filteredComps.filter(c=>c.corrStatus==="受注"),
+  };
 
   return (
     <div className="fade" style={{display:"flex",flexDirection:"column",flex:1,minHeight:0}}>
-      {/* ヘッダー */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,flexShrink:0}}>
         <h1 style={{fontSize:20,fontWeight:700,letterSpacing:"-.5px"}}>企業別管理</h1>
         <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          <button onClick={()=>setEditComp(blankComp())} className="btn"
+            style={{padding:"6px 12px",fontSize:12,fontWeight:600,background:"#1D4ED8",color:"#fff",
+              border:"none",borderRadius:6}}>+ 企業</button>
           <div style={{position:"relative"}}>
             <span style={{position:"absolute",left:8,top:"50%",transform:"translateY(-50%)",color:"#94A3B8",fontSize:12}}>🔍</span>
             <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="企業名・担当者..."
@@ -877,97 +895,57 @@ function CompanyPage({ companies, setCompanies, projects, reminderDays }) {
         </div>
       </div>
 
-      {/* リスト本体 */}
       <div style={{flex:1,overflowY:"auto"}}>
-        {projects.length===0&&(
-          <div className="card" style={{padding:32,textAlign:"center",color:"#94A3B8"}}>案件管理で案件を作成してください</div>
-        )}
-        {projects.filter(p=>p.status!=="完了").map(proj=>{
-          const comps = filteredComps(proj.id);
-          const meCount = companies.filter(c=>c.project===proj.id&&c.ball==="me").length;
-          const total   = companies.filter(c=>c.project===proj.id).length;
-          const alertCount = companies.filter(c=>c.project===proj.id&&isAlert(c)).length;
-          const isOpen  = expanded[proj.id];
+        {Object.entries(SECTIONS).map(([status, config])=>{
+          const comps = companiesByStatus[status];
+          const isOpen = sectionOpen[status];
+          if(comps.length===0) return null;
+
           return (
-            <div key={proj.id} style={{marginBottom:8}}>
-              {/* 親案件行 */}
+            <div key={status} style={{marginBottom:12}}>
               <div style={{display:"flex",alignItems:"center",gap:8,padding:"10px 14px",
-                background:"#fff",borderRadius:isOpen?"8px 8px 0 0":"8px",
-                border:"1px solid #E2E8F0",borderBottom:isOpen?"1px solid #F1F5F9":"1px solid #E2E8F0",
-                cursor:"pointer"}} onClick={()=>toggle(proj.id)}>
-                <span style={{fontSize:13,color:isOpen?A.main:"#94A3B8",fontWeight:700,minWidth:16,transition:"transform .15s",
-                  display:"inline-block",transform:isOpen?"rotate(90deg)":"rotate(0deg)"}}>▶</span>
-                <span style={{width:9,height:9,borderRadius:"50%",background:proj.color,flexShrink:0}}/>
-                <span style={{fontSize:14,fontWeight:700,flex:1,color:"#1E293B"}}>{proj.name}</span>
-                {alertCount>0&&<span style={{fontSize:11,color:"#DC2626",background:"#FEF2F2",padding:"2px 8px",borderRadius:10,fontWeight:600,border:"1px solid #FECACA"}}>⚠ {alertCount}件要対応</span>}
-                <span style={{fontSize:12,color:"#94A3B8"}}>
-                  <span style={{color:meCount>0?"#DC2626":"#94A3B8",fontWeight:meCount>0?600:400}}>自分:{meCount}</span>
-                  <span style={{margin:"0 4px",color:"#E2E8F0"}}>/</span>
-                  <span>全体:{total}</span>
-                </span>
-                <button className="btn" onClick={e=>{e.stopPropagation();setEditComp(blankComp(proj.id));}}
-                  style={{padding:"2px 10px",fontSize:11,background:proj.color+"18",color:proj.color,border:`1px solid ${proj.color}44`}}>＋ 企業追加</button>
+                background:config.bg,color:config.color,fontWeight:700,fontSize:13,
+                cursor:"pointer",userSelect:"none"}}
+                onClick={()=>toggleSection(status)}>
+                <span style={{fontSize:14}}>{isOpen?"▾":"▸"}</span>
+                <span>{config.icon} {status}</span>
+                <span style={{marginLeft:"auto",fontSize:12,fontWeight:600}}>{comps.length}社</span>
               </div>
 
-              {/* 子企業行（展開時） */}
               {isOpen&&(
-                <div style={{border:"1px solid #E2E8F0",borderTop:"none",borderRadius:"0 0 8px 8px",overflow:"hidden"}}>
-                  {comps.length===0?(
-                    <div style={{padding:"16px 20px",color:"#94A3B8",fontSize:13,textAlign:"center"}}>企業がありません</div>
-                  ):comps.map((c,ci)=>{
-                    const ball=BALL[c.ball]||BALL.me;
-                    const alert=isAlert(c);
-                    const days=daysSince(c.lastDate);
-                    return (
-                      <div key={c.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 16px",
-                        background:alert?"#FFF5F5":ci%2===0?"#FAFAFA":"#fff",
-                        borderBottom:"1px solid #F1F5F9",cursor:"pointer"}}
-                        onClick={()=>setEditComp({...c})}>
-                        <span style={{width:20,flexShrink:0}}/>
-                        {/* 企業名 */}
-                        <div style={{flex:1,minWidth:0}}>
-                          <div style={{fontSize:13,fontWeight:600,color:alert?"#DC2626":"#1E293B",display:"flex",alignItems:"center",gap:6}}>
-                            {alert&&<span style={{fontSize:11}}>⚠</span>}
-                            {c.name}
-                            {c.person&&<span style={{fontSize:11,color:"#94A3B8",fontWeight:400}}>／{c.person}</span>}
-                            <span style={{fontSize:10,color:"#64748B",background:"#F1F5F9",padding:"0 5px",borderRadius:4}}>{c.corrStatus}</span>
-                          </div>
-                          {c.nextAction&&<div style={{fontSize:11,color:alert?"#DC2626":"#64748B",marginTop:2}}>{alert&&"⚠ "}{c.nextAction}</div>}
-                        </div>
-                        {/* 最終連絡 */}
-                        <div style={{fontSize:11,color:days>7?"#DC2626":days>3?"#D97706":"#94A3B8",textAlign:"right",minWidth:60,fontWeight:days>3?600:400}}>
-                          {days===0?"今日":`${days}日前`}
-                        </div>
-                        {/* リマインダー */}
-                        {c.reminderDate&&(
-                          <div style={{fontSize:11,color:alert?"#DC2626":"#6366F1",minWidth:60,textAlign:"center",
-                            background:alert?"#FEE2E2":"#EEF2FF",padding:"2px 6px",borderRadius:4}}>
-                            📅 {c.reminderDate.slice(5).replace("-","/")}
-                          </div>
-                        )}
-                        {/* ボール切り替え */}
-                        <div style={{display:"flex",gap:4,flexShrink:0}} onClick={e=>e.stopPropagation()}>
-                          {Object.entries(BALL).map(([k,v])=>(
-                            <button key={k} onClick={()=>switchBall(c,k)}
-                              style={{padding:"3px 8px",fontSize:11,fontWeight:600,borderRadius:6,cursor:"pointer",
-                                background:c.ball===k?v.color:"#F8FAFC",
-                                color:c.ball===k?"#fff":v.color,
-                                border:`1px solid ${c.ball===k?v.color:v.color+"44"}`}}>
-                              {v.icon} {v.l}
-                            </button>
-                          ))}
-                        </div>
+                <div style={{border:`1px solid ${config.bg}`,borderTop:"none",background:"#fff"}}>
+                  {comps.map((comp,idx)=>(
+                    <div key={comp.id} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 20px",
+                      borderBottom:idx<comps.length-1?"1px solid #F1F5F9":"none",
+                      cursor:"pointer",background:"#fff",transition:"all .15s"}}
+                      onMouseEnter={e=>e.currentTarget.style.background="#F8FAFC"}
+                      onMouseLeave={e=>e.currentTarget.style.background="#fff"}>
+                      <div style={{flex:1,minWidth:0}} onClick={()=>setEditComp({...comp})}>
+                        <div style={{fontSize:13,fontWeight:600,color:"#0F1923"}}>{comp.name}</div>
+                        {comp.person&&<div style={{fontSize:11,color:"#94A3B8",marginTop:2}}>{comp.person}</div>}
                       </div>
-                    );
-                  })}
+                      <span style={{fontSize:11,color:"#94A3B8",whiteSpace:"nowrap"}}>
+                        {comp.lastDate&&daysSince(comp.lastDate)>=0?`${daysSince(comp.lastDate)}日前`:""}
+                      </span>
+                      <button onClick={e=>{e.stopPropagation();if(confirm("削除してもよろしいですか？"))delComp(comp.id);}} className="btn"
+                        style={{padding:"4px 8px",fontSize:11,background:"#FEF2F2",color:"#DC2626",
+                          border:"1px solid #FECACA",borderRadius:4,fontWeight:600,cursor:"pointer",
+                          transition:"all .15s"}}
+                        onMouseEnter={e=>{e.currentTarget.style.background="#FECACA";e.currentTarget.style.color="#fff";}}
+                        onMouseLeave={e=>{e.currentTarget.style.background="#FEF2F2";e.currentTarget.style.color="#DC2626";}}>削除</button>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
           );
         })}
+
+        {companies.length===0&&(
+          <div className="card" style={{padding:32,textAlign:"center",color:"#94A3B8"}}>企業がありません</div>
+        )}
       </div>
 
-      {/* 編集モーダル */}
       {editComp&&(
         <div className="overlay">
           <div style={{background:"#fff",borderRadius:14,padding:24,width:480,maxWidth:"95vw",maxHeight:"92vh",overflowY:"auto",boxShadow:"0 20px 50px rgba(0,0,0,.2)"}} className="fade">
@@ -986,32 +964,13 @@ function CompanyPage({ companies, setCompanies, projects, reminderDays }) {
                 </select>
               </div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-                <div><div className="lbl" style={{marginBottom:4}}>ボール</div>
-                  <div style={{display:"flex",flexDirection:"column",gap:4}}>
-                    {Object.entries(BALL).map(([k,v])=>(
-                      <label key={k} style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer",padding:"5px 8px",borderRadius:6,
-                        background:editComp.ball===k?v.bg:"transparent",border:editComp.ball===k?`1px solid ${v.color}`:"1px solid transparent"}}>
-                        <input type="radio" name="editball" value={k} checked={editComp.ball===k}
-                          onChange={()=>{
-                            let rd=editComp.reminderDate||"";
-                            if(k==="client") rd=addD(TODAY,reminderDays||3);
-                            else if(k==="me") rd="";
-                            setEditComp(v=>({...v,ball:k,reminderDate:rd}));
-                          }} style={{accentColor:v.color}}/>
-                        <span style={{fontSize:12,fontWeight:600,color:editComp.ball===k?v.color:"#374151"}}>{v.icon} {v.l}</span>
-                      </label>
-                    ))}
-                  </div>
+                <div><div className="lbl" style={{marginBottom:4}}>ステータス</div>
+                  <select value={editComp.corrStatus||"提案中"} onChange={e=>setEditComp(v=>({...v,corrStatus:e.target.value}))} style={{width:"100%",marginBottom:8}}>
+                    {CORR_STATUS.map(s=><option key={s} value={s}>{s}</option>)}
+                  </select>
                 </div>
-                <div>
-                  <div><div className="lbl" style={{marginBottom:4}}>ステータス</div>
-                    <select value={editComp.corrStatus||"提案中"} onChange={e=>setEditComp(v=>({...v,corrStatus:e.target.value}))} style={{width:"100%",marginBottom:8}}>
-                      {CORR_STATUS.map(s=><option key={s} value={s}>{s}</option>)}
-                    </select>
-                  </div>
-                  <div><div className="lbl" style={{marginBottom:4}}>最終連絡日</div>
-                    <input type="date" value={editComp.lastDate||TODAY} onChange={e=>setEditComp(v=>({...v,lastDate:e.target.value}))} style={{width:"100%"}}/></div>
-                </div>
+                <div><div className="lbl" style={{marginBottom:4}}>最終連絡日</div>
+                  <input type="date" value={editComp.lastDate||TODAY} onChange={e=>setEditComp(v=>({...v,lastDate:e.target.value}))} style={{width:"100%"}}/></div>
               </div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
                 <div><div className="lbl" style={{marginBottom:4}}>次のアクション</div>
@@ -1582,215 +1541,59 @@ function WeekView({ weekDays, tasksOn, eventsOn, projOf, onSlotDblClick, onTaskC
   );
 }
 
-/* ─── AUTH SCREEN ─── */
-function AuthScreen() {
-  const [mode,     setMode]     = React.useState("login");
-  const [email,    setEmail]    = React.useState("");
-  const [password, setPassword] = React.useState("");
-  const [error,    setError]    = React.useState("");
-  const [loading,  setLoading]  = React.useState(false);
-  const auth = firebase.auth();
-
-  const handleEmail = async () => {
-    if (!email.trim() || !password) { setError("メールアドレスとパスワードを入力してください"); return; }
-    setLoading(true); setError("");
-    try {
-      if (mode === "login") {
-        await auth.signInWithEmailAndPassword(email.trim(), password);
-      } else {
-        await auth.createUserWithEmailAndPassword(email.trim(), password);
-      }
-    } catch (e) {
-      const MSG = {
-        "auth/user-not-found":       "メールアドレスが登録されていません",
-        "auth/wrong-password":        "パスワードが間違っています",
-        "auth/invalid-email":         "メールアドレスの形式が正しくありません",
-        "auth/email-already-in-use":  "このメールアドレスは既に使用されています",
-        "auth/weak-password":         "パスワードは6文字以上で入力してください",
-        "auth/invalid-credential":    "メールアドレスまたはパスワードが正しくありません",
-        "auth/too-many-requests":     "試行回数が多すぎます。しばらくしてから再試行してください",
-      };
-      setError(MSG[e.code] || e.message);
-    }
-    setLoading(false);
-  };
-
-  const handleGoogle = async () => {
-    setLoading(true); setError("");
-    try {
-      const provider = new firebase.auth.GoogleAuthProvider();
-      await auth.signInWithPopup(provider);
-    } catch (e) {
-      if (e.code !== "auth/popup-closed-by-user") setError(e.message);
-    }
-    setLoading(false);
-  };
-
-  return (
-    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#F0F4F8",fontFamily:"'DM Sans',sans-serif"}}>
-      <div style={{background:"#fff",borderRadius:16,padding:40,width:400,maxWidth:"95vw",boxShadow:"0 20px 60px rgba(0,0,0,.12)"}} className="fade">
-        <div style={{textAlign:"center",marginBottom:28}}>
-          <div style={{width:52,height:52,borderRadius:14,background:"#EFF6FF",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,margin:"0 auto 12px"}}>📅</div>
-          <h1 style={{fontSize:22,fontWeight:800,color:"#0F1923",letterSpacing:"-.5px",margin:0}}>タスク管理ツール</h1>
-          <p style={{fontSize:13,color:"#94A3B8",marginTop:6,marginBottom:0}}>
-            {mode==="login" ? "アカウントにサインイン" : "新しいアカウントを作成"}
-          </p>
-        </div>
-
-        <div style={{display:"flex",flexDirection:"column",gap:12}}>
-          <div>
-            <div className="lbl" style={{marginBottom:4}}>メールアドレス</div>
-            <input type="email" value={email} onChange={e=>setEmail(e.target.value)}
-              placeholder="email@example.com" style={{width:"100%"}}
-              onKeyDown={e=>e.key==="Enter"&&handleEmail()} autoFocus/>
-          </div>
-          <div>
-            <div className="lbl" style={{marginBottom:4}}>パスワード</div>
-            <input type="password" value={password} onChange={e=>setPassword(e.target.value)}
-              placeholder={mode==="register"?"6文字以上":"パスワード"} style={{width:"100%"}}
-              onKeyDown={e=>e.key==="Enter"&&handleEmail()}/>
-          </div>
-
-          {error && (
-            <div style={{background:"#FEF2F2",border:"1px solid #FECACA",borderRadius:8,padding:"10px 12px",fontSize:12,color:"#DC2626",lineHeight:1.5}}>{error}</div>
-          )}
-
-          <button className="btn" onClick={handleEmail} disabled={loading}
-            style={{background:"#1D4ED8",color:"#fff",padding:"12px",fontSize:13,width:"100%",
-              opacity:loading?0.6:1,boxShadow:"0 2px 8px rgba(29,78,216,.25)",marginTop:4}}>
-            {loading ? "処理中..." : mode==="login" ? "サインイン" : "アカウントを作成"}
-          </button>
-
-          <div style={{display:"flex",alignItems:"center",gap:8}}>
-            <div style={{flex:1,height:1,background:"#E2E8F0"}}/>
-            <span style={{fontSize:11,color:"#CBD5E1",fontWeight:600}}>または</span>
-            <div style={{flex:1,height:1,background:"#E2E8F0"}}/>
-          </div>
-
-          <button className="btn" onClick={handleGoogle} disabled={loading}
-            style={{background:"#fff",color:"#374151",border:"1.5px solid #E2E8F0",padding:"11px",fontSize:13,
-              width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:8,
-              opacity:loading?0.6:1,boxShadow:"0 1px 4px rgba(0,0,0,.06)"}}>
-            <svg width="18" height="18" viewBox="0 0 48 48">
-              <path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34.1 6.5 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-3.9z"/>
-              <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 16.1 19 13 24 13c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34.1 6.5 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/>
-              <path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.3 35.3 26.8 36 24 36c-5.3 0-9.7-3.3-11.3-7.9l-6.5 5C9.6 39.6 16.3 44 24 44z"/>
-              <path fill="#1976D2" d="M43.6 20.1H42V20H24v8h11.3c-.8 2.2-2.2 4.1-4.1 5.5l6.2 5.2C41.4 35.7 44 30.3 44 24c0-1.3-.1-2.7-.4-3.9z"/>
-            </svg>
-            Googleでサインイン
-          </button>
-        </div>
-
-        <div style={{textAlign:"center",marginTop:20}}>
-          <button onClick={()=>{setMode(m=>m==="login"?"register":"login");setError("");setEmail("");setPassword("");}}
-            style={{background:"none",border:"none",color:"#1D4ED8",fontSize:12,cursor:"pointer",
-              fontFamily:"'DM Sans',sans-serif",fontWeight:600,textDecoration:"underline"}}>
-            {mode==="login" ? "アカウントをお持ちでない方はこちら（新規登録）" : "既にアカウントをお持ちの方はこちら（ログイン）"}
-          </button>
-        </div>
-
-        <div style={{marginTop:20,padding:"10px 14px",background:"#F8FAFC",borderRadius:8,border:"1px solid #E2E8F0",fontSize:11,color:"#94A3B8",lineHeight:1.7,textAlign:"center"}}>
-          🔒 データはあなたのアカウントにのみ保存されます<br/>
-          他のユーザーからは一切アクセスできません
-        </div>
-      </div>
-    </div>
-  );
-}
-
 /* ─── APP ─── */
 function App() {
-  // ── 認証・Firestore状態 ──
-  const [authUser,   setAuthUser]   = useState(null);
-  const [authReady,  setAuthReady]  = useState(false);
-  const [dataLoaded, setDataLoaded] = useState(false);
-  const saveTimer = useRef(null);
-
   const [view,        setView]        = useState("dashboard");
-  const [sideOpen,    setSideOpen]    = useState(()=> typeof window!=="undefined" && window.innerWidth > 768);
-
-  // データ状態（デフォルト値で初期化、Firestoreからロード後に上書き）
-  const [tasks,       setTasks]       = useState([]);
-  const [checklists,  setChecklists]  = useState([]);
-  const [events,      setEvents]      = useState([]);
-  const [projects,    setProjects]    = useState([]);
-  const [companies,   setCompanies]   = useState([]);
-  const [calMode,     setCalMode]     = useState("month");
+  const [sideOpen,    setSideOpen]    = useState(true);
+  const lsGet = (k, def) => { try { const v=localStorage.getItem(k); return v?JSON.parse(v):def; } catch(e){ return def; } };
+  const [tasks,       setTasks]       = useState(()=>lsGet("sz_tasks",[]));
+  const [checklists,  setChecklists]  = useState(()=>lsGet("sz_checklists",[]));
+  const [events,      setEvents]      = useState(()=>lsGet("sz_events",[]));
+  const [projects,    setProjects]    = useState(()=>lsGet("sz_projects",[]));
+  const [companies,    setCompanies]    = useState(()=>lsGet("sz_companies",[]));
+  const [shortcuts,    setShortcuts]    = useState(()=>{
+    try { const s=localStorage.getItem("task-hub-shortcuts-v1"); if(s){const p=JSON.parse(s); if(p&&p.categories&&Array.isArray(p.categories))return p.categories;} } catch(e){}
+    return [];
+  });
+  const [scMdl,        setScMdl]        = useState(null); // {name:"",url:"",category:""}
+  const saveShortcuts = (newCats) => { setShortcuts(newCats); try{localStorage.setItem("task-hub-shortcuts-v1",JSON.stringify({categories:newCats}));}catch(e){} };  const [calMode,     setCalMode]     = useState("month");
   const [calDate,     setCalDate]     = useState({ year:todayObj.getFullYear(), month:todayObj.getMonth() });
   const [weekStart,   setWeekStart]   = useState(TODAY);
   const [selDay,      setSelDay]      = useState(null);
   const [projView,    setProjView]    = useState("schedule");
   const [taskFilter,  setTaskFilter]  = useState({status:"undone",priority:"all",project:"all"});
-  const [taskSearch,  setTaskSearch]  = useState("");
+  const [taskOrder,    setTaskOrder]    = useState(()=>lsGet("sz_taskOrder",{}));
+  const [taskSlot,     setTaskSlot]     = useState(()=>lsGet("sz_taskSlot",{}));
+  const [taskSlotOpen, setTaskSlotOpen] = useState({}); // 未設定=タスクがあれば開く
+  const [taskSearch,  setTaskSearch]   = useState("");
   const [showDone,    setShowDone]    = useState(false);
 
-  const [eventCats, setEventCats] = useState([
+  // event categories (user-editable)
+  const [eventCats, setEventCats] = useState(()=>lsGet("sz_eventCats",[
     { id:"c1", label:"大会議室", color:"#6366F1", icon:"🏢" },
     { id:"c2", label:"小会議室", color:"#0891B2", icon:"🚪" },
     { id:"c3", label:"応接室",   color:"#059669", icon:"🛋" },
     { id:"c4", label:"OUT",      color:"#D97706", icon:"🚗" },
-  ]);
+  ]));
 
-  const [settings, setSettings] = useState({ weekStartsOn: 0, reminderDays: 3 });
+  // settings
+  const [settings, setSettings] = useState(()=>lsGet("sz_settings",{ weekStartsOn: 0, reminderDays: 3 }));
   const [showSettings, setShowSettings] = useState(false);
 
-  // ── Firebase認証の監視 ──
-  useEffect(() => {
-    const unsub = firebase.auth().onAuthStateChanged(user => {
-      setAuthUser(user);
-      setAuthReady(true);
-      if (!user) setDataLoaded(false);
-    });
-    return unsub;
-  }, []);
-
-  // ── Firestoreからデータをロード（ログイン時） ──
-  useEffect(() => {
-    if (!authUser) return;
-    const db = firebase.firestore();
-    db.doc(`users/${authUser.uid}/data/main`).get().then(doc => {
-      if (doc.exists) {
-        const d = doc.data();
-        if (Array.isArray(d.tasks))      setTasks(d.tasks);
-        if (Array.isArray(d.events))     setEvents(d.events);
-        if (Array.isArray(d.projects))   setProjects(d.projects);
-        if (Array.isArray(d.companies))  setCompanies(d.companies);
-        if (Array.isArray(d.checklists)) setChecklists(d.checklists);
-        if (Array.isArray(d.eventCats))  setEventCats(d.eventCats);
-        if (d.settings)      setSettings(s => ({...s, ...d.settings}));
-        if (d.notifSettings) setNotifSettings(s => ({...s, ...d.notifSettings}));
-        // colOrder（スプレッドシート列順）
-        if (d.colOrder !== undefined) {
-          try { localStorage.setItem("sz_colOrder", JSON.stringify(d.colOrder)); } catch(e) {}
-        }
-      }
-      setDataLoaded(true);
-    }).catch(err => {
-      console.error("Firestore load error:", err);
-      setDataLoaded(true);
-    });
-  }, [authUser?.uid]);
-
-  // ── Firestoreへ保存（各データ変更時、debounce 1.5秒） ──
-  const scheduleFirestoreSave = (patch) => {
-    if (!authUser) return;
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => {
-      firebase.firestore().doc(`users/${authUser.uid}/data/main`).set(patch, { merge: true });
-    }, 1500);
-  };
-
-  useEffect(() => { if (dataLoaded && authUser) scheduleFirestoreSave({ tasks }); },       [tasks]);
-  useEffect(() => { if (dataLoaded && authUser) scheduleFirestoreSave({ events }); },      [events]);
-  useEffect(() => { if (dataLoaded && authUser) scheduleFirestoreSave({ projects }); },    [projects]);
-  useEffect(() => { if (dataLoaded && authUser) scheduleFirestoreSave({ companies }); },   [companies]);
-  useEffect(() => { if (dataLoaded && authUser) scheduleFirestoreSave({ checklists }); },  [checklists]);
-  useEffect(() => { if (dataLoaded && authUser) scheduleFirestoreSave({ eventCats }); },   [eventCats]);
-  useEffect(() => { if (dataLoaded && authUser) scheduleFirestoreSave({ settings }); },    [settings]);
-  useEffect(() => { if (dataLoaded && authUser) scheduleFirestoreSave({ notifSettings });}, [notifSettings]);
+  // localStorage保存
+  useEffect(()=>{ try{localStorage.setItem("sz_tasks",JSON.stringify(tasks));}catch(e){} },[tasks]);
+  useEffect(()=>{ try{localStorage.setItem("sz_checklists",JSON.stringify(checklists));}catch(e){} },[checklists]);
+  useEffect(()=>{ try{localStorage.setItem("sz_events",JSON.stringify(events));}catch(e){} },[events]);
+  useEffect(()=>{ try{localStorage.setItem("sz_projects",JSON.stringify(projects));}catch(e){} },[projects]);
+  useEffect(()=>{ try{localStorage.setItem("sz_companies",JSON.stringify(companies));}catch(e){} },[companies]);
+  useEffect(()=>{ try{localStorage.setItem("sz_eventCats",JSON.stringify(eventCats));}catch(e){} },[eventCats]);
+  useEffect(()=>{ try{localStorage.setItem("sz_settings",JSON.stringify(settings));}catch(e){} },[settings]);
+  useEffect(()=>{ try{localStorage.setItem("sz_notifSettings",JSON.stringify(notifSettings));}catch(e){} },[notifSettings]);
+  useEffect(()=>{ try{localStorage.setItem("sz_taskOrder",JSON.stringify(taskOrder));}catch(e){} },[taskOrder]);
+  useEffect(()=>{ try{localStorage.setItem("sz_taskSlot",JSON.stringify(taskSlot));}catch(e){} },[taskSlot]);
 
   const [notifPerm,    setNotifPerm]   = useState(typeof Notification!=="undefined"?Notification.permission:"denied");
-  const [notifSettings,setNotifSettings] = useState({
+  const [notifSettings,setNotifSettings] = useState(()=>lsGet("sz_notifSettings",{
     morning: true,
     morningTime: "09:30",
     morningDays: [1,2,3,4,5],
@@ -1799,7 +1602,7 @@ function App() {
     overdue: true,
     overdueRepeat: "hourly",
     taskNotifs: {},
-  });
+  }));
   const notifFired = useRef(new Set());
 
   // modal state
@@ -1901,7 +1704,7 @@ function App() {
     const p = await Notification.requestPermission();
     setNotifPerm(p);
     if(p==="granted"){
-      new Notification("✅ タスク管理ツール 通知が有効になりました", {body:"タスクの通知が届くようになります"});
+      new Notification("✅ タスク管理 通知が有効になりました", {body:"タスクの通知が届くようになります"});
     }
   };
   const sendNotif = (title, body) => {
@@ -2078,33 +1881,11 @@ function App() {
     return results;
   };
 
-  const blankProj  = () => ({ name:"", color:"#2563EB", status:"未着手", owner:"", start:TODAY, end:addD(TODAY,30), progress:0 });
 
-  // ── 認証・ロード状態チェック ──
-  if (!authReady) return (
-    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#F0F4F8",fontFamily:"'DM Sans',sans-serif"}}>
-      <div style={{textAlign:"center"}}>
-        <div style={{fontSize:36,marginBottom:12}}>📅</div>
-        <div style={{fontSize:14,fontWeight:600,color:"#94A3B8"}}>読み込み中...</div>
-      </div>
-    </div>
-  );
-  if (!authUser) return <AuthScreen />;
-  if (!dataLoaded) return (
-    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#F0F4F8",fontFamily:"'DM Sans',sans-serif"}}>
-      <div style={{textAlign:"center"}}>
-        <div style={{fontSize:36,marginBottom:12}}>📅</div>
-        <div style={{fontSize:14,fontWeight:600,color:"#94A3B8"}}>データを読み込み中...</div>
-        <div style={{fontSize:12,color:"#CBD5E1",marginTop:6}}>{authUser.email}</div>
-      </div>
-    </div>
-  );
+  const blankProj  = () => ({ name:"", color:"#2563EB", status:"未着手", owner:"", start:TODAY, end:addD(TODAY,30), progress:0 });
 
   return (
     <div style={{display:"flex",minHeight:"100vh",background:"#F0F4F8"}}>
-
-      {/* スマホ用：サイドバー外タップで閉じる */}
-      {sideOpen && <div className="sidebar-overlay" onClick={()=>setSideOpen(false)}/>}
 
       {/* SIDEBAR */}
       <aside className="sidebar" style={{width:SW,flexShrink:0,background:"#fff",borderRight:"1px solid #E2E8F0",display:"flex",flexDirection:"column",position:"sticky",top:0,height:"100vh",zIndex:40,overflow:"hidden"}}>
@@ -2116,7 +1897,7 @@ function App() {
           </div>
           {sideOpen && (
             <div style={{flex:1,lineHeight:1}}>
-              <span style={{fontWeight:800,fontSize:14,letterSpacing:"-.5px",color:"#1A2B5F",fontStyle:"italic",whiteSpace:"nowrap",display:"block"}}>タスク管理ツール</span>
+              <span style={{fontWeight:800,fontSize:17,letterSpacing:"-.5px",color:"#1A2B5F",fontStyle:"italic"}}>タスク管理</span>
               <div style={{height:2.5,background:"#D0021B",borderRadius:1,marginTop:2,width:"100%"}}/>
             </div>
           )}
@@ -2125,31 +1906,21 @@ function App() {
         <nav style={{padding:"10px 8px",flex:1,display:"flex",flexDirection:"column",gap:2,overflowY:"auto"}}>
           {sideOpen && <div style={{fontSize:10,fontWeight:600,color:"#CBD5E1",letterSpacing:"1px",padding:"4px 8px 6px",textTransform:"uppercase"}}>メニュー</div>}
           {NAV_ITEMS.map(({v,icon,label}) => (
-            <button key={v} className={`sideitem${view===v?" act":""}`}
-              onClick={()=>{ setView(v); if(window.innerWidth<=768) setSideOpen(false); }}
-              title={!sideOpen?label:""}
+            <button key={v} className={`sideitem${view===v?" act":""}`} onClick={()=>setView(v)} title={!sideOpen?label:""}
               style={{padding:sideOpen?"9px 10px":"9px 0",justifyContent:sideOpen?"flex-start":"center",gap:sideOpen?9:0}}>
               <span style={{fontSize:14,width:22,textAlign:"center",flexShrink:0}}>{icon}</span>
               {sideOpen && <span>{label}</span>}
+
             </button>
           ))}
+
         </nav>
-        {/* Settings + Logout at bottom */}
-        <div style={{padding:"10px 8px",borderTop:"1px solid #F1F5F9",flexShrink:0,display:"flex",flexDirection:"column",gap:2}}>
-          {sideOpen && (
-            <div style={{fontSize:10,color:"#94A3B8",padding:"2px 8px 4px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontWeight:500}}>
-              {authUser?.email}
-            </div>
-          )}
+        {/* Settings button at bottom */}
+        <div style={{padding:"10px 8px",borderTop:"1px solid #F1F5F9",flexShrink:0}}>
           <button className="sideitem" onClick={()=>setShowSettings(true)} title={!sideOpen?"設定":""}
             style={{padding:sideOpen?"9px 10px":"9px 0",justifyContent:sideOpen?"flex-start":"center",gap:sideOpen?9:0}}>
             <span style={{fontSize:14,width:22,textAlign:"center",flexShrink:0}}>⚙</span>
             {sideOpen && <span style={{fontSize:13}}>設定</span>}
-          </button>
-          <button className="sideitem" onClick={()=>firebase.auth().signOut()} title={!sideOpen?"ログアウト":""}
-            style={{padding:sideOpen?"9px 10px":"9px 0",justifyContent:sideOpen?"flex-start":"center",gap:sideOpen?9:0,color:"#DC2626"}}>
-            <span style={{fontSize:14,width:22,textAlign:"center",flexShrink:0}}>↩</span>
-            {sideOpen && <span style={{fontSize:13}}>ログアウト</span>}
           </button>
         </div>
       </aside>
@@ -2158,16 +1929,10 @@ function App() {
       <div style={{flex:1,minWidth:0,display:"flex",flexDirection:"column",overflow:"hidden"}}>
         <header style={{height:56,background:"#fff",borderBottom:"1px solid #E2E8F0",padding:"0 24px",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
           <div style={{fontSize:14,fontWeight:600,letterSpacing:"-.2px"}}>{NAV_ITEMS.find(n=>n.v===view)?.label}</div>
-          <div style={{display:"flex",gap:6}}>
-            <button className="btn mobile-hide" onClick={()=>setProjMdl(blankProj())} style={{background:"#F1F5F9",color:"#374151",padding:"7px 14px",fontSize:12,border:"1px solid #E2E8F0"}}>＋ 案件</button>
-            <button className="btn mobile-small" onClick={()=>setEventMdl(blankEvent())} style={{background:"#6366F1",color:"#fff",padding:"7px 14px",fontSize:12,boxShadow:"0 2px 8px rgba(99,102,241,.25)"}}>
-              <span className="mobile-hide">📅 予定追加</span>
-              <span className="desktop-hide">📅 予定</span>
-            </button>
-            <button className="btn mobile-small" onClick={()=>setTaskMdl(blankTask())} style={{background:A.main,color:"#fff",padding:"7px 16px",fontSize:12,boxShadow:"0 2px 8px rgba(29,78,216,.25)"}}>
-              <span className="mobile-hide">＋ タスク追加</span>
-              <span className="desktop-hide">＋ タスク</span>
-            </button>
+          <div style={{display:"flex",gap:8}}>
+            <button className="btn" onClick={()=>setProjMdl(blankProj())} style={{background:"#F1F5F9",color:"#374151",padding:"7px 14px",fontSize:12,border:"1px solid #E2E8F0"}}>＋ 案件</button>
+            <button className="btn" onClick={()=>setEventMdl(blankEvent())} style={{background:"#6366F1",color:"#fff",padding:"7px 14px",fontSize:12,boxShadow:"0 2px 8px rgba(99,102,241,.25)"}}>📅 予定追加</button>
+            <button className="btn" onClick={()=>setTaskMdl(blankTask())} style={{background:A.main,color:"#fff",padding:"7px 16px",fontSize:12,boxShadow:"0 2px 8px rgba(29,78,216,.25)"}}>＋ タスク追加</button>
           </div>
         </header>
 
@@ -2177,15 +1942,11 @@ function App() {
             <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",overflow:"hidden"}}>
               <div style={{padding:"8px 16px 6px",flexShrink:0,display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:"1px solid #E2E8F0",background:"#fff"}}>
                 <h1 style={{fontSize:20,fontWeight:700,letterSpacing:"-.5px"}}>案件管理</h1>
-                <div style={{display:"flex",gap:3,background:"#F1F5F9",borderRadius:8,padding:3,border:"1px solid #E2E8F0"}}>
-                  <button className="subbtn" onClick={()=>setProjView("kanban")}>かんばん</button>
-                  <button className="subbtn" onClick={()=>setProjView("gantt")}>ガント</button>
-                  <button className="subbtn act">スケジュール</button>
-                </div>
               </div>
               <ScheduleView
                 projects={projects}
                 tasks={tasks}
+                companies={companies}
                 onTaskToggle={(t)=>{ setTasks(ts=>ts.map(x=>x.id===t.id?{...x,done:!x.done}:x)); }}
                 onTaskClick={t=>setTaskMdl(t)}
                 onAddTask={(date,projId)=>setTaskMdl({...blankTask(date,""),project:projId||null})}
@@ -2280,26 +2041,190 @@ function App() {
                           })}
                         </div>}
                   </div>
-                  {/* 今日のタスク */}
-                  <div className="card" style={{padding:16,display:"flex",flexDirection:"column",overflow:"hidden",gridArea:"today-task"}}>
-                    <div style={{fontSize:10,fontWeight:600,color:"#EA580C",letterSpacing:".5px",textTransform:"uppercase",marginBottom:12}}>✓ 今日のタスク</div>
-                    {tasksOn(TODAY).filter(t=>!t.done).length===0
-                      ? <EmptyState icon="✓" text="なし" sub=""/>
-                      : <div style={{overflowY:"auto",flex:1}}>
-                          {tasksOn(TODAY).filter(t=>!t.done).sort((a,b)=>a.time.localeCompare(b.time)).map(t=>{
-                            const p=projOf(t.project); const hi=isHighPrio(t);
-                            return <div key={t.id} onClick={()=>setTaskMdl(t)}
-                              style={{display:"flex",gap:8,alignItems:"center",padding:"8px 10px",background:hi?"#FFFBEB":"#F8FAFC",borderRadius:8,marginBottom:6,border:hi?"1px solid #FDE68A":"1px solid #E2E8F0",cursor:"pointer"}}>
-                              <input type="checkbox" checked={t.done} onClick={e=>e.stopPropagation()} onChange={()=>toggleDone(t.id)} style={{accentColor:A.main,cursor:"pointer",flexShrink:0}}/>
-                              <div style={{flex:1,minWidth:0}}>
-                                <div style={{fontSize:12,fontWeight:hi?700:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:hi?"#DC2626":"#0F1923"}}>{t.title}{(t._eventTitle||(t._fromChecklist&&t.memo))&&<span style={{fontWeight:400,color:"#94A3B8"}}> （{t._eventTitle||(t.memo?.replace(" のチェックシート",""))}）</span>}</div>
-                                <div style={{fontSize:11,color:"#94A3B8"}}>{t.time&&`${t.time} `}{p&&<span style={{color:p.color}}>{p.name}</span>}</div>
+                  {/* 今日のタスク - スロット式DnD */}
+                  <div className="card" style={{padding:"12px 14px",display:"flex",flexDirection:"column",overflow:"hidden",gridArea:"today-task"}}>
+                    <div style={{fontSize:10,fontWeight:600,color:"#EA580C",letterSpacing:".5px",textTransform:"uppercase",marginBottom:8}}>✓ 今日のタスク</div>
+                    {(()=>{
+                      const SLOTS = [
+                        {id:"morning",   label:"🌅 午前",   color:"#F59E0B"},
+                        {id:"afternoon", label:"☀️ 午後",   color:"#6366F1"},
+                        {id:"evening",   label:"🌆 夕方",   color:"#0891B2"},
+                        {id:"unset",     label:"📋 未設定", color:"#94A3B8"},
+                      ];
+                      const undone = tasksOn(TODAY).filter(t=>!t.done);
+                      if(undone.length===0) return <EmptyState icon="✓" text="なし" sub=""/>;
+
+                      const getSlot  = (t) => taskSlot[t.id]||"unset";
+                      const getOrder = (slotId) => {
+                        const key=`${TODAY}_${slotId}`;
+                        const order=taskOrder[key]||[];
+                        const inSlot=undone.filter(t=>getSlot(t)===slotId);
+                        return [...inSlot].sort((a,b)=>{
+                          const ai=order.indexOf(a.id),bi=order.indexOf(b.id);
+                          if(ai===-1&&bi===-1) return 0;
+                          if(ai===-1) return 1; if(bi===-1) return -1;
+                          return ai-bi;
+                        });
+                      };
+
+
+                      const onDragStart = (t,slotId) => {
+                        window._dndId=t.id; window._dndSlot=slotId; window._dndOver=null;
+                      };
+                      const onDragEnd = () => {
+                        window._dndId=null; window._dndSlot=null; window._dndOver=null;
+                        setTaskSlotOpen(s=>({...s})); // re-render to clear indicators
+                      };
+
+                      // カード上でのdragover: 上半分ならbefore、下半分ならafter
+                      const onDragOverCard = (e,targetId,slotId) => {
+                        e.preventDefault(); e.stopPropagation();
+                        const id=window._dndId;
+                        if(!id||id===targetId) return;
+                        const rect=e.currentTarget.getBoundingClientRect();
+                        const isBefore = e.clientY < rect.top + rect.height/2;
+                        window._dndOver={targetId, slotId, before:isBefore};
+                        setTaskSlotOpen(s=>({...s})); // re-render for indicator
+                      };
+
+                      // スロット空エリアへのdragover（末尾扱い）
+                      const onDragOverEmpty = (e,slotId) => {
+                        e.preventDefault(); e.stopPropagation();
+                        window._dndOver={targetId:null, slotId, before:false};
+                        setTaskSlotOpen(s=>({...s}));
+                      };
+
+                      // ドロップ確定
+                      const onDrop = (e,slotId) => {
+                        e.preventDefault();
+                        const id=window._dndId;
+                        if(!id) return;
+                        const over=window._dndOver;
+                        // スロット変更
+                        setTaskSlot(s=>({...s,[id]:slotId}));
+                        // 挿入位置を計算
+                        setTaskOrder(o=>{
+                          // 元スロットから除外
+                          const fromSlot=window._dndSlot;
+                          const fromKey=`${TODAY}_${fromSlot}`;
+                          const toKey=`${TODAY}_${slotId}`;
+                          const fromOrder=(o[fromKey]||[]).filter(x=>x!==id);
+                          const toBase=getOrder(slotId).map(t=>t.id).filter(x=>x!==id);
+                          let toOrder=[...toBase];
+                          if(over&&over.slotId===slotId&&over.targetId){
+                            const idx=toOrder.indexOf(over.targetId);
+                            if(idx!==-1){
+                              toOrder.splice(over.before?idx:idx+1, 0, id);
+                            } else {
+                              toOrder.push(id);
+                            }
+                          } else {
+                            toOrder.push(id);
+                          }
+                          const result={...o,[toKey]:toOrder};
+                          if(fromSlot!==slotId) result[fromKey]=fromOrder;
+                          return result;
+                        });
+                        window._dndId=null; window._dndSlot=null; window._dndOver=null;
+                        setTaskSlotOpen(s=>({...s}));
+                      };
+
+                      return (
+                        <div style={{overflowY:"auto",flex:1}}>
+                          {SLOTS.map(slot=>{
+                            const slotTasks=getOrder(slot.id);
+                            // タスクがある場合はデフォルト開く、ユーザーが明示的に操作した場合はその値を使う
+                            const isOpen = slot.id in taskSlotOpen ? taskSlotOpen[slot.id] : getOrder(slot.id).length>0;
+                            return (
+                              <div key={slot.id} style={{marginBottom:4}}>
+                                {/* スロットヘッダー */}
+                                <div style={{display:"flex",alignItems:"center",gap:6,padding:"3px 4px",cursor:"pointer",borderRadius:5,
+                                  background:isOpen?slot.color+"11":"transparent"}}
+                                  onClick={()=>setTaskSlotOpen(s=>({...s,[slot.id]:!s[slot.id]}))}>
+                                  <div style={{flex:1,borderTop:isOpen?"none":`1.5px dashed ${slot.color}55`}}/>
+                                  <span style={{fontSize:10,color:slot.color,fontWeight:700,whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:3}}>
+                                    {slot.label}
+                                    {slotTasks.length>0&&<span style={{background:slot.color,color:"#fff",borderRadius:8,padding:"0 5px",fontSize:9}}>{slotTasks.length}</span>}
+                                  </span>
+                                  <span style={{fontSize:11,color:slot.color,fontWeight:700}}>{isOpen?"▾":"＋"}</span>
+                                  <div style={{flex:1,borderTop:isOpen?"none":`1.5px dashed ${slot.color}55`}}/>
+                                </div>
+                                {/* タスク一覧 */}
+                                {isOpen&&(
+                                  <div style={{padding:"3px 0 3px 4px",minHeight:36,
+                                    border:`1.5px dashed ${slot.color}44`,borderTop:"none",
+                                    borderRadius:"0 0 6px 6px",background:slot.color+"06"}}
+                                    onDragOver={e=>{if(!window._dndOver||window._dndOver.slotId!==slot.id) onDragOverEmpty(e,slot.id);else e.preventDefault();}}
+                                    onDrop={e=>onDrop(e,slot.id)}>
+                                    {slotTasks.length===0&&(
+                                      <div style={{padding:"8px 6px",fontSize:11,color:slot.color+"88",textAlign:"center"}}>ここにドロップ</div>
+                                    )}
+                                    {slotTasks.map(t=>{
+                                      const p=projOf(t.project); const hi=isHighPrio(t); const od=isOverdue(t);
+                                      const over=window._dndOver;
+                                      const showBefore=over&&over.targetId===t.id&&over.before&&over.slotId===slot.id;
+                                      const showAfter =over&&over.targetId===t.id&&!over.before&&over.slotId===slot.id;
+                                      return (
+                                        <div key={t.id}>
+                                          {showBefore&&<div style={{height:2,background:"#3B82F6",borderRadius:2,margin:"1px 4px",boxShadow:"0 0 4px #3B82F688"}}/>}
+                                          <div draggable
+                                            onDragStart={()=>onDragStart(t,slot.id)}
+                                            onDragEnd={onDragEnd}
+                                            onDragOver={e=>onDragOverCard(e,t.id,slot.id)}
+                                            onDrop={e=>onDrop(e,slot.id)}
+                                            onClick={()=>setTaskMdl(t)}
+                                            style={{display:"flex",gap:7,alignItems:"center",padding:"6px 8px",
+                                              background:od?"#FFF5F5":hi?"#FFFBEB":"#fff",borderRadius:6,marginBottom:2,
+                                              border:od?"1px solid #FECACA":hi?"1px solid #FDE68A":"1px solid #E2E8F0",
+                                              cursor:"grab",userSelect:"none",boxShadow:"0 1px 2px rgba(0,0,0,.04)",
+                                              opacity:window._dndId===t.id?0.4:1}}>
+                                            <span style={{color:"#CBD5E1",fontSize:11,flexShrink:0}}>⠿</span>
+                                            <input type="checkbox" checked={t.done} onClick={e=>e.stopPropagation()} onChange={()=>toggleDone(t.id)}
+                                              style={{accentColor:A.main,cursor:"pointer",flexShrink:0}}/>
+                                            <div style={{flex:1,minWidth:0}}>
+                                              <div style={{fontSize:12,fontWeight:hi?700:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",
+                                                color:od?"#DC2626":hi?"#DC2626":"#0F1923"}}>
+                                                {od&&"⚠ "}{t.title}{(t._eventTitle||(t._fromChecklist&&t.memo))&&<span style={{fontWeight:400,color:"#94A3B8",fontSize:11}}> （{t._eventTitle||(t.memo?.replace(" のチェックシート",""))}）</span>}
+                                              </div>
+                                              {p&&<div style={{fontSize:10,color:p.color}}>{p.name}</div>}
+                                              {(t.company||t.ballStatus!=="none")&&(
+                                                <div style={{fontSize:9,color:"#94A3B8",marginTop:2}}>
+                                                  {t.company&&companies.find(c=>c.id===t.company)&&<span>{companies.find(c=>c.id===t.company)?.name}</span>}
+                                                  {t.ballStatus&&t.ballStatus!=="none"&&(
+                                                    <span style={{marginLeft:t.company?"6px":"0"}}>
+                                                      🎯 {{
+                                                        "waiting-contact": "受電待",
+                                                        "waiting-reply": "返信待",
+                                                        "internal-review": "社内検",
+                                                        "quick-reply": "返信",
+                                                        "phone": "電話",
+                                                        "other": "他"
+                                                      }[t.ballStatus]||t.ballStatus}
+                                                    </span>
+                                                  )}
+                                                </div>
+                                              )}
+                                            </div>
+                                          </div>
+                                          {showAfter&&<div style={{height:2,background:"#3B82F6",borderRadius:2,margin:"1px 4px",boxShadow:"0 0 4px #3B82F688"}}/>}
+                                        </div>
+                                      );
+                                    })}
+                                    {/* 末尾インジケーター */}
+                                    {window._dndOver&&window._dndOver.slotId===slot.id&&!window._dndOver.targetId&&(
+                                      <div style={{height:2,background:"#3B82F6",borderRadius:2,margin:"1px 4px",boxShadow:"0 0 4px #3B82F688"}}/>
+                                    )}
+                                  </div>
+                                )}
                               </div>
-                            </div>;
+                            );
                           })}
-                        </div>}
+                        </div>
+                      );
+                    })()}
                   </div>
-                  {/* 明日の予定 */}
+
+                                    {/* 明日の予定 */}
                   <div className="card" style={{padding:16,display:"flex",flexDirection:"column",overflow:"hidden",gridArea:"tom-ev"}}>
                     <div style={{fontSize:10,fontWeight:600,color:"#64748B",letterSpacing:".5px",textTransform:"uppercase",marginBottom:12}}>📅 明日の予定</div>
                     {eventsOn(TOMORROW).length===0
@@ -2332,6 +2257,23 @@ function App() {
                               <div style={{flex:1,minWidth:0}}>
                                 <div style={{fontSize:12,fontWeight:hi?700:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:hi?"#DC2626":"#0F1923"}}>{t.title}{(t._eventTitle||(t._fromChecklist&&t.memo))&&<span style={{fontWeight:400,color:"#94A3B8"}}> （{t._eventTitle||(t.memo?.replace(" のチェックシート",""))}）</span>}</div>
                                 <div style={{fontSize:11,color:"#94A3B8"}}>{t.time&&`${t.time} `}{p&&<span style={{color:p.color}}>{p.name}</span>}</div>
+                                {(t.company||t.ballStatus!=="none")&&(
+                                  <div style={{fontSize:10,color:"#94A3B8",marginTop:2}}>
+                                    {t.company&&companies.find(c=>c.id===t.company)&&<span>{companies.find(c=>c.id===t.company)?.name}</span>}
+                                    {t.ballStatus&&t.ballStatus!=="none"&&(
+                                      <span style={{marginLeft:t.company?"6px":"0"}}>
+                                        {{
+                                          "waiting-contact": "受電待",
+                                          "waiting-reply": "返信待",
+                                          "internal-review": "社内検",
+                                          "quick-reply": "返信",
+                                          "phone": "電話",
+                                          "other": "他"
+                                        }[t.ballStatus]||t.ballStatus}
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             </div>;
                           })}
@@ -2463,6 +2405,47 @@ function App() {
                       {eventsOn(selDay).length===0&&(
                         <div style={{color:"#94A3B8",fontSize:13}}>この日の予定はありません</div>
                       )}
+
+                      {/* タスク表示 */}
+                      <div style={{marginTop:16,paddingTop:16,borderTop:"1px solid #E2E8F0"}}>
+                        <h4 style={{fontSize:12,fontWeight:700,marginBottom:10,color:"#1E293B"}}>タスク</h4>
+                        {tasksOn(selDay).filter(t=>!t.done).map(t=>{
+                          const p=projOf(t.project);
+                          return (
+                            <div key={t.id} style={{display:"flex",gap:10,alignItems:"flex-start",padding:"10px 12px",background:"#F8FAFC",borderRadius:8,marginBottom:7,border:"1px solid #E2E8F0",cursor:"pointer"}}
+                              onClick={()=>setTaskMdl(t)}>
+                              <input type="checkbox" checked={t.done} onClick={e=>e.stopPropagation()} onChange={()=>toggleDone(t.id)} style={{accentColor:A.main,cursor:"pointer",marginTop:3,flexShrink:0}}/>
+                              <div style={{flex:1}}>
+                                <div style={{fontSize:13,fontWeight:600,color:"#1E293B"}}>{t.title}</div>
+                                <div style={{fontSize:11,color:"#94A3B8",marginTop:2}}>
+                                  {t.time&&<span>{t.time}</span>}
+                                  {p&&<span style={{marginLeft:t.time?"6px":"0",color:p.color}}>{p.name}</span>}
+                                </div>
+                                {(t.company||t.ballStatus!=="none")&&(
+                                  <div style={{fontSize:10,color:"#94A3B8",marginTop:4}}>
+                                    {t.company&&companies.find(c=>c.id===t.company)&&<span>{companies.find(c=>c.id===t.company)?.name}</span>}
+                                    {t.ballStatus&&t.ballStatus!=="none"&&(
+                                      <span style={{marginLeft:t.company?"6px":"0"}}>
+                                        {{
+                                          "waiting-contact": "受電待",
+                                          "waiting-reply": "返信待",
+                                          "internal-review": "社内検",
+                                          "quick-reply": "返信",
+                                          "phone": "電話",
+                                          "other": "他"
+                                        }[t.ballStatus]||t.ballStatus}
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                        {tasksOn(selDay).filter(t=>!t.done).length===0&&(
+                          <div style={{color:"#94A3B8",fontSize:13}}>この日のタスクはありません</div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}
@@ -2475,8 +2458,6 @@ function App() {
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
                   <h1 style={{fontSize:20,fontWeight:700,letterSpacing:"-.5px"}}>案件管理</h1>
                   <div style={{display:"flex",gap:3,background:"#F1F5F9",borderRadius:8,padding:3,border:"1px solid #E2E8F0"}}>
-                    <button className={`subbtn${projView==="kanban"?" act":""}`} onClick={()=>setProjView("kanban")}>かんばん</button>
-                    <button className={`subbtn${projView==="gantt"?" act":""}`}  onClick={()=>setProjView("gantt")}>ガント</button>
                     <button className={`subbtn${projView==="schedule"?" act":""}`} onClick={()=>setProjView("schedule")}>スケジュール</button>
                   </div>
                 </div>
@@ -2484,53 +2465,12 @@ function App() {
                   <div className="card" style={{padding:48}}><EmptyState icon="◈" text="案件がまだありません" sub="右上の「＋ 案件」から追加してください"/></div>
                 )}
 
-                {projView==="kanban"&&projects.length>0&&(
-                  <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14}}>
-                    {KANBAN_COLS.map(col=>{
-                      const colP=projects.filter(p=>p.status===col);
-                      const sc=STATUS_CFG[col];
-                      return (
-                        <div key={col}>
-                          <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:10}}>
-                            <div style={{width:7,height:7,borderRadius:"50%",background:sc.color}}/>
-                            <span style={{fontSize:12,fontWeight:600,color:sc.color}}>{col}</span>
-                            <span style={{fontSize:10,color:"#94A3B8",background:"#F1F5F9",padding:"1px 6px",borderRadius:8}}>{colP.length}</span>
-                          </div>
-                          {colP.map(p=>{
-                            const pT=tasks.filter(t=>t.project===p.id);
-                            const done=pT.filter(t=>t.done).length;
-                            return (
-                              <div key={p.id} className="kcard" style={{borderTop:`2px solid ${p.color}`}} onClick={()=>setProjMdl(p)}>
-                                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
-                                  <span style={{fontSize:13,fontWeight:600,lineHeight:1.4}}>{p.name}</span>
-                                  
-                                </div>
-                                <div style={{fontSize:11,color:"#64748B",marginBottom:10}}>
-                                  <span className="tag" style={{background:sc.bg,color:sc.color,marginRight:8}}>{p.status}</span>
-                                  👤 {p.owner||"未設定"} · 〜{p.end}
-                                </div>
-                                {p.description&&<div style={{fontSize:12,color:"#94A3B8",marginBottom:10,lineHeight:1.6,borderLeft:"2px solid #E2E8F0",paddingLeft:8}}>{p.description}</div>}
-                                <div style={{marginBottom:6}}>
-                                  <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#94A3B8",marginBottom:4}}>
-                                    <span>進捗</span><span style={{fontWeight:600,color:p.color}}>{p.progress}%</span>
-                                  </div>
-                                  <div className="pbar"><div className="pfill" style={{width:`${p.progress}%`,background:p.color}}/></div>
-                                </div>
-                                {pT.length>0&&<div style={{fontSize:11,color:"#94A3B8"}}>{pT.length}件中 <span style={{color:"#059669",fontWeight:600}}>{done}完了</span></div>}
-                              </div>
-                            );
-                          })}
-                          {colP.length===0&&<div style={{padding:"16px 0",textAlign:"center",color:"#E2E8F0",fontSize:12,border:"1px dashed #E2E8F0",borderRadius:8}}>なし</div>}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
 
                 {projView==="schedule"&&(
                   <ScheduleView
                     projects={projects}
                     tasks={tasks}
+                    companies={companies}
                     onTaskToggle={(t)=>{
                       const newDone = !t.done;
                       setTasks(ts=>ts.map(x=>x.id===t.id?{...x,done:newDone}:x));
@@ -2555,42 +2495,7 @@ function App() {
                   />
                 )}
 
-                                {projView==="gantt"&&projects.length>0&&(
-                  <div style={{overflowX:"auto",flex:1}}>
-                    <div style={{minWidth:700}}>
-                      <div style={{display:"grid",gridTemplateColumns:`180px repeat(12,1fr)`,background:"#F8FAFC",borderRadius:"10px 10px 0 0",borderBottom:"1px solid #E2E8F0"}}>
-                        <div style={{padding:"8px 12px",fontSize:10,fontWeight:600,color:"#94A3B8",borderRight:"1px solid #E2E8F0",textTransform:"uppercase",letterSpacing:".5px"}}>案件</div>
-                        {ganttMons.map(({month})=>(
-                          <div key={month} style={{padding:"8px 4px",textAlign:"center",fontSize:10,fontWeight:600,color:"#94A3B8",borderRight:"1px solid #E2E8F0"}}>{MON[month]}</div>
-                        ))}
-                      </div>
-                      {projects.map((p,idx)=>(
-                        <div key={p.id} style={{display:"grid",gridTemplateColumns:`180px repeat(12,1fr)`,borderBottom:"1px solid #E2E8F0",background:idx%2===0?"#fff":"#FAFBFC",minHeight:44,alignItems:"center",cursor:"pointer"}}
-                          onClick={()=>setProjMdl(p)}>
-                          <div style={{padding:"8px 12px",borderRight:"1px solid #E2E8F0",display:"flex",alignItems:"center",gap:7}}>
-                            <div style={{width:7,height:7,borderRadius:"50%",background:p.color,flexShrink:0}}/>
-                            <span style={{fontSize:12,fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</span>
-                          </div>
-                          {ganttMons.map(({year,month})=>{
-                            const cs=`${year}-${String(month+1).padStart(2,"0")}-01`;
-                            const ce=`${year}-${String(month+1).padStart(2,"0")}-${dim(year,month)}`;
-                            const ov=p.start<=ce&&p.end>=cs;
-                            const bs=p.start>cs?p.start:cs;
-                            const be=p.end<ce?p.end:ce;
-                            const cd=dim(year,month);
-                            const op=ov?(dBet(cs,bs)/cd)*100:0;
-                            const wp=ov?Math.min(100-op,(dBet(bs,be)+1)/cd*100):0;
-                            return (
-                              <div key={month} style={{position:"relative",height:24,borderRight:"1px solid #E2E8F0",padding:"0 2px"}}>
-                                {ov&&<div style={{position:"absolute",top:"50%",transform:"translateY(-50%)",left:`calc(${op}% + 2px)`,width:`calc(${wp}% - 4px)`,height:10,borderRadius:3,background:p.color,opacity:.8,minWidth:3}}/>}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                
               </div>
             )}
 
@@ -2758,6 +2663,114 @@ function App() {
               />
             )}
 
+            {view==="shortcuts"&&(
+              <div className="fade" style={{display:"flex",flexDirection:"column",flex:1,minHeight:0}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexShrink:0}}>
+                  <h1 style={{fontSize:20,fontWeight:700,letterSpacing:"-.5px"}}>ショートカット</h1>
+                  <div style={{display:"flex",gap:8}}>
+                    <button className="btn" onClick={()=>setScMdl({name:"",url:"",category:shortcuts.length>0?shortcuts[0].id:""})}
+                      style={{background:A.main,color:"#fff",padding:"8px 16px",fontSize:12,border:"none",borderRadius:8}}>+ 項目追加</button>
+                    <button className="btn" onClick={()=>{
+                      const catName = prompt("カテゴリ名を入力してください:");
+                      if(catName) { saveShortcuts([...shortcuts, {id:"cat"+Date.now(),name:catName,items:[]}]); }
+                    }} style={{background:A.light,color:A.dark,padding:"8px 16px",fontSize:12,border:`1px solid ${A.mid}`,borderRadius:8}}>+ カテゴリ追加</button>
+                  </div>
+                </div>
+
+                <div style={{flex:1,overflowY:"auto"}}>
+                  {shortcuts.length===0 ? (
+                    <div style={{padding:40,textAlign:"center",color:"#94A3B8"}}>
+                      <div style={{fontSize:14}}>カテゴリがまだありません</div>
+                      <div style={{fontSize:12,marginTop:4}}>上のボタンからカテゴリを追加してください</div>
+                    </div>
+                  ) : shortcuts.map(cat=>(
+                    <div key={cat.id} style={{marginBottom:20}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+                        <h2 style={{fontSize:13,fontWeight:700,color:"#1E293B"}}>{cat.name}</h2>
+                        <div style={{display:"flex",gap:4}}>
+                          <button className="btn" onClick={()=>{
+                            const n=prompt("新しいカテゴリ名:",cat.name);
+                            if(n) saveShortcuts(shortcuts.map(c=>c.id===cat.id?{...c,name:n}:c));
+                          }} style={{padding:"4px 10px",fontSize:11,background:"#F1F5F9",color:"#475569",border:"1px solid #E2E8F0",borderRadius:4}}>編集</button>
+                          <button className="btn" onClick={()=>{
+                            if(confirm("このカテゴリを削除しますか？")) saveShortcuts(shortcuts.filter(c=>c.id!==cat.id));
+                          }} style={{padding:"4px 10px",fontSize:11,background:"#FEF2F2",color:"#DC2626",border:"1px solid #FECACA",borderRadius:4}}>削除</button>
+                        </div>
+                      </div>
+                      {Array.isArray(cat.items) && cat.items.length > 0 ? (
+                        <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                          {cat.items.map((item,ii)=>(
+                            <div key={ii} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",background:"#F8FAFC",borderRadius:8,border:"1px solid #E2E8F0"}}>
+                              <button className="btn" onClick={()=>{navigator.clipboard.writeText(item.url||"");alert("URLをコピーしました");}}
+                                style={{padding:"4px 8px",fontSize:11,background:"#EFF6FF",color:"#1D4ED8",border:"1px solid #BFDBFE",borderRadius:4,flexShrink:0}}>📋</button>
+                              <span style={{fontSize:11,color:"#94A3B8",flexShrink:0,width:60}}>{cat.name}</span>
+                              <a href={item.url} target="_blank" rel="noopener noreferrer"
+                                style={{flex:1,fontSize:12,fontWeight:500,color:"#1E293B",textDecoration:"none",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{item.name}</a>
+                              <button className="btn" onClick={()=>setScMdl({...item,category:cat.id,editMode:true})}
+                                style={{padding:"3px 8px",fontSize:10,background:"#F1F5F9",color:"#475569",border:"1px solid #E2E8F0",borderRadius:4,flexShrink:0}}>編集</button>
+                              <button className="btn" onClick={()=>{
+                                if(confirm("この項目を削除しますか？")) saveShortcuts(shortcuts.map(c=>c.id===cat.id?{...c,items:c.items.filter(x=>x.id!==item.id)}:c));
+                              }} style={{padding:"3px 8px",fontSize:10,background:"#FEF2F2",color:"#DC2626",border:"1px solid #FECACA",borderRadius:4,flexShrink:0}}>削除</button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div style={{padding:12,textAlign:"center",color:"#94A3B8",fontSize:12}}>項目がまだありません</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* ショートカット追加/編集モーダル */}
+                {scMdl!==null&&(
+                  <div className="overlay" onClick={()=>setScMdl(null)}>
+                    <div className="modal" onClick={e=>e.stopPropagation()} style={{maxWidth:420}}>
+                      <h2 style={{fontSize:18,fontWeight:700,marginBottom:16}}>{scMdl.editMode?"項目を編集":"項目を追加"}</h2>
+                      <div style={{display:"flex",flexDirection:"column",gap:14}}>
+                        <div>
+                          <div className="lbl">カテゴリ</div>
+                          <select value={scMdl.category||""} onChange={e=>setScMdl({...scMdl,category:e.target.value})} style={{width:"100%"}}>
+                            {shortcuts.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <div className="lbl">項目名 *</div>
+                          <input value={scMdl.name||""} onChange={e=>setScMdl({...scMdl,name:e.target.value})}
+                            placeholder="項目名を入力..." style={{width:"100%"}} autoFocus />
+                        </div>
+                        <div>
+                          <div className="lbl">URL *</div>
+                          <input value={scMdl.url||""} onChange={e=>setScMdl({...scMdl,url:e.target.value})}
+                            placeholder="https://..." style={{width:"100%"}} />
+                        </div>
+                      </div>
+                      <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginTop:20}}>
+                        {scMdl.editMode&&(
+                          <button className="btn" onClick={()=>{
+                            if(confirm("削除しますか？")){
+                              saveShortcuts(shortcuts.map(c=>c.id===scMdl.category?{...c,items:(c.items||[]).filter(x=>x.id!==scMdl.id)}:c));
+                              setScMdl(null);
+                            }
+                          }} style={{padding:"8px 16px",fontSize:12,background:"#FEF2F2",color:"#DC2626",border:"1px solid #FECACA",borderRadius:8,marginRight:"auto"}}>削除</button>
+                        )}
+                        <button className="btn" onClick={()=>setScMdl(null)}
+                          style={{padding:"8px 20px",fontSize:12,background:"#F1F5F9",color:"#475569",border:"1px solid #E2E8F0",borderRadius:8}}>キャンセル</button>
+                        <button className="btn" onClick={()=>{
+                          if(!scMdl.name||!scMdl.url){alert("項目名とURLを入力してください");return;}
+                          if(scMdl.editMode){
+                            saveShortcuts(shortcuts.map(c=>c.id===scMdl.category?{...c,items:(c.items||[]).map(x=>x.id===scMdl.id?{...x,name:scMdl.name,url:scMdl.url}:x)}:c));
+                          } else {
+                            saveShortcuts(shortcuts.map(c=>c.id===scMdl.category?{...c,items:[...(c.items||[]),{id:"sc"+Date.now(),name:scMdl.name,url:scMdl.url}]}:c));
+                          }
+                          setScMdl(null);
+                        }} style={{padding:"8px 20px",fontSize:12,background:A.main,color:"#fff",border:"none",borderRadius:8}}>保存する</button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
 
 
           </main>
@@ -2803,12 +2816,16 @@ function App() {
           notifPerm={notifPerm}
           eventCats={eventCats}
           checklists={checklists}
+          onAddItem={(clId,txt,off)=>{
+            setChecklists(prev=>prev.map(cl=>cl.id===clId?{...cl,items:[...cl.items,{text:txt,offset:off}]}:cl));
+          }}
         />
       )}
       {taskMdl!==null&&(
         <TaskModal
           initial={taskMdl}
           projects={projects}
+          companies={companies}
           onSave={saveTask}
           onDelete={deleteTask}
           onClose={()=>setTaskMdl(null)}
@@ -2874,6 +2891,73 @@ function App() {
                       )}
                     </div>
                   ))}
+                </div>
+              </div>
+
+              {/* Shortcut management */}
+              <div>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+                  <div className="lbl">ショートカット（設定）</div>
+                  <button className="btn" onClick={()=>{
+                    const cat = prompt("カテゴリ名を入力してください:");
+                    if(cat) {
+                      try {
+                        const stored = localStorage.getItem("task-hub-shortcuts-v1");
+                        const data = stored ? JSON.parse(stored) : {categories:[]};
+                        if(!data.categories) data.categories = [];
+                        data.categories.push({id:"cat"+Date.now(),name:cat,items:[]});
+                        localStorage.setItem("task-hub-shortcuts-v1",JSON.stringify(data));
+                        alert("カテゴリを追加しました");
+                        window.location.reload();
+                      } catch(e){}
+                    }
+                  }} style={{background:A.light,color:A.dark,padding:"4px 10px",fontSize:11,border:`1px solid ${A.mid}`}}>+ カテゴリ</button>
+                </div>
+                <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                  {(() => {
+                    try {
+                      const stored = localStorage.getItem("task-hub-shortcuts-v1");
+                      const data = stored ? JSON.parse(stored) : {categories:[]};
+                      const cats = data.categories || [];
+                      return cats.length > 0 ? cats.flatMap((cat,ci) => [
+                        <div key={`cat-${cat.id}`} style={{padding:"8px 12px",background:"#EFF6FF",borderRadius:8,border:`1px solid #BFDBFE`,marginTop:ci>0?8:0}}>
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                            <span style={{fontWeight:600,fontSize:12,color:"#1D4ED8"}}>{cat.name}</span>
+                            <div style={{display:"flex",gap:4}}>
+                              <button className="btn" onClick={()=>{
+                                const newName = prompt("新しいカテゴリ名:",cat.name);
+                                if(newName) {
+                                  try {
+                                    const stored = localStorage.getItem("task-hub-shortcuts-v1");
+                                    const data = stored ? JSON.parse(stored) : {categories:[]};
+                                    const idx = data.categories.findIndex(c=>c.id===cat.id);
+                                    if(idx >= 0) data.categories[idx].name = newName;
+                                    localStorage.setItem("task-hub-shortcuts-v1",JSON.stringify(data));
+                                    window.location.reload();
+                                  } catch(e){}
+                                }
+                              }} style={{padding:"2px 6px",fontSize:10,background:"#fff",color:"#1D4ED8",border:"1px solid #BFDBFE",borderRadius:3}}>編集</button>
+                              <button className="btn" onClick={()=>{
+                                if(confirm("このカテゴリを削除しますか？")) {
+                                  try {
+                                    const stored = localStorage.getItem("task-hub-shortcuts-v1");
+                                    const data = stored ? JSON.parse(stored) : {categories:[]};
+                                    data.categories = data.categories.filter(c=>c.id!==cat.id);
+                                    localStorage.setItem("task-hub-shortcuts-v1",JSON.stringify(data));
+                                    window.location.reload();
+                                  } catch(e){}
+                                }
+                              }} style={{padding:"2px 6px",fontSize:10,background:"#FEF2F2",color:"#DC2626",border:"1px solid #FECACA",borderRadius:3}}>削除</button>
+                            </div>
+                          </div>
+                        </div>
+                      ]) : (
+                        <div style={{padding:"12px",textAlign:"center",color:"#94A3B8",fontSize:12}}>カテゴリがまだありません</div>
+                      );
+                    } catch(e) {
+                      return <div style={{color:"#DC2626",fontSize:12}}>エラーが発生しました</div>;
+                    }
+                  })()}
                 </div>
               </div>
 
